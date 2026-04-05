@@ -57,7 +57,9 @@ services:
 
   # ── HeartStream ───────────────────────────────────────────────────────────────
   heartstream:
-    image: ghcr.io/therealbotbender/heartstream:latest
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     container_name: heartstream-v2
     restart: unless-stopped
     depends_on:
