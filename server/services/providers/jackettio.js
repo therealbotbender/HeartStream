@@ -1,0 +1,89 @@
+/**
+ * Jackettio Provider
+ *
+ * Self-hosted Node.js addon that queries Jackett torrent indexers
+ * and converts cached results via Real-Debrid into direct HTTPS stream URLs.
+ *
+ * GitHub: https://github.com/arvida42/jackettio
+ *
+ * Environment vars:
+ *   JACKETTIO_URL        — base URL of your Jackettio instance (default: http://jackettio:4000)
+ *   REALDEBRID_API_KEY   — your Real-Debrid API key
+ *   JACKETTIO_INDEXERS   — comma-separated indexer IDs (default: thepiratebay,yts,eztv,therarbg)
+ *   JACKETTIO_QUALITIES  — comma-separated quality values in px (default: 720,1080,2160)
+ */
+
+const BASE_URL = (process.env.JACKETTIO_URL || 'http://jackettio:4000').replace(/\/$/, '');
+const RD_KEY   = process.env.REALDEBRID_API_KEY || '';
+
+const INDEXERS  = (process.env.JACKETTIO_INDEXERS  || 'thepiratebay,yts,eztv,therarbg').split(',');
+const QUALITIES = (process.env.JACKETTIO_QUALITIES || '720,1080,2160').split(',').map(Number);
+
+// Quality preference for ranking (lower index = preferred)
+const QUALITY_RANK = [2160, 1080, 720, 480, 360];
+
+// Build the base64 config blob once at startup — Jackettio reads it from the URL path
+function buildConfig() {
+    return Buffer.from(JSON.stringify({
+        debridId:               'realdebrid',
+        debridApiKey:           RD_KEY,
+        indexers:               INDEXERS,
+        qualities:              QUALITIES,
+        maxTorrents:            5,
+        sortCached:             [['quality', true], ['size', true]],
+        sortUncached:           [['seeders', true]],
+        hideUncached:           true,       // only return streams RD has cached = instant play
+        priotizePackTorrents:   2,
+        forceCacheNextEpisode:  false,
+        indexerTimeoutSec:      30,
+        metaLanguage:           '',
+        enableMediaFlow:        false,
+    })).toString('base64');
+}
+
+const CONFIG = buildConfig();
+
+function rankStream(stream) {
+    const name = (stream.name || stream.description || '').toLowerCase();
+    for (let i = 0; i < QUALITY_RANK.length; i++) {
+        if (name.includes(`${QUALITY_RANK[i]}p`)) return i;
+    }
+    return QUALITY_RANK.length;
+}
+
+class JackettioProvider {
+    async getStream(content) {
+        if (!RD_KEY) throw new Error('REALDEBRID_API_KEY is not set');
+
+        const { imdbId, type } = content;
+        if (!imdbId) throw new Error('imdbId is required — convert TMDB ID first');
+
+        const stremioType = type === 'movie' ? 'movie' : 'series';
+        const idSegment   = type === 'movie'
+            ? imdbId
+            : `${imdbId}:${content.seasonNumber || 1}:${content.episodeNumber || 1}`;
+
+        const url = `${BASE_URL}/${CONFIG}/stream/${stremioType}/${idSegment}.json`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) throw new Error(`Jackettio responded ${res.status}`);
+
+        const { streams = [] } = await res.json();
+        const direct = streams.filter(s => s.url?.startsWith('http'));
+
+        if (!direct.length) return null;
+
+        direct.sort((a, b) => rankStream(a) - rankStream(b));
+        const best = direct[0];
+
+        return {
+            success:    true,
+            url:        best.url,
+            mimeType:   best.url.endsWith('.m3u8') ? 'hls' : 'mp4',
+            name:       best.name || best.description || 'Direct Stream',
+            provider:   'jackettio',
+            allStreams:  direct.map(s => ({ url: s.url, name: s.name || s.description || '' }))
+        };
+    }
+}
+
+module.exports = JackettioProvider;

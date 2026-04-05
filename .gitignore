@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit secrets
+.env
+
+# Database — data is server-local, not source-controlled
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Adblock cache
+data/adblock-cache/
+
+# Logs
+*.log
+logs/
+
+# Local tooling
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

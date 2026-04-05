@@ -1,0 +1,95 @@
+services:
+
+  # ── Jackett ───────────────────────────────────────────────────────────────────
+  # Torrent indexer proxy. Pre-seeded with a known API key (see config/jackett/).
+  # After first deploy, visit http://your-server:9117 to add indexers:
+  #   Recommended: The Pirate Bay, YTS, EZTV, TheRARBG
+  # No need to copy the API key — it's already set in JACKETT_API_KEY below.
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - jackett-config:/config
+      # Pre-seed the API key so Jackettio can connect on first deploy
+      - ./config/jackett/ServerConfig.json:/config/Jackett/ServerConfig.json
+    ports:
+      - "9117:9117"   # Expose for indexer setup UI
+    networks:
+      - heartstream-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9117/api/v2.0/indexers?_apikey=5984118c7b886ba38420de8b0208f87c"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Jackettio ─────────────────────────────────────────────────────────────────
+  # Stremio addon: queries Jackett indexers + Real-Debrid → direct HTTPS stream URLs.
+  # Config is built programmatically in streamResolver.js from env vars — no UI needed.
+  jackettio:
+    image: ghcr.io/arvida42/jackettio:latest
+    container_name: jackettio
+    restart: unless-stopped
+    depends_on:
+      jackett:
+        condition: service_healthy
+    environment:
+      - PORT=4000
+      - JACKETT_URL=http://jackett:9117
+      - JACKETT_API_KEY=5984118c7b886ba38420de8b0208f87c
+      - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
+      - DATA_FOLDER=/data
+    volumes:
+      - jackettio-data:/data
+    networks:
+      - heartstream-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:4000/manifest.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── HeartStream ───────────────────────────────────────────────────────────────
+  heartstream:
+    image: ghcr.io/therealbotbender/heartstream:latest
+    container_name: heartstream-v2
+    restart: unless-stopped
+    depends_on:
+      jackettio:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
+      - JACKETTIO_URL=http://jackettio:4000
+      - REALDEBRID_API_KEY=${REALDEBRID_API_KEY}
+      - JACKETTIO_INDEXERS=${JACKETTIO_INDEXERS:-thepiratebay,yts,eztv,therarbg}
+      - JACKETTIO_QUALITIES=${JACKETTIO_QUALITIES:-720,1080,2160}
+    volumes:
+      - heartstream-data:/data
+    networks:
+      - heartstream-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  jackett-config:
+  jackettio-data:
+  heartstream-data:
+
+networks:
+  heartstream-network:
+    driver: bridge

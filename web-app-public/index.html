@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeartStream V2</title>
+    <meta name="description" content="Stream your favorite movies and TV shows with HeartStream">
+    <meta name="theme-color" content="#1e293b">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HeartStream">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- User Selection Screen -->
+        <div id="user-selection" class="screen active">
+            <div class="container">
+                <h1>Who's watching? v2.2.7</h1>
+                <div id="user-grid" class="user-grid">
+                    <!-- Users will be populated here -->
+                </div>
+                <button id="create-user-btn" class="new-user-btn">
+                    <span class="plus">+</span>
+                    Add User
+                </button>
+            </div>
+        </div>
+
+        <!-- Main App Screen -->
+        <div id="main-app" class="screen">
+            <header class="header">
+                <div class="header-left">
+                    <h1 class="logo">HeartStream</h1>
+                    <nav class="nav">
+                        <button class="nav-btn active" data-section="home">Home</button>
+                        <button class="nav-btn" data-section="movies">Movies</button>
+                        <button class="nav-btn" data-section="tv">TV Shows</button>
+                        <button class="nav-btn" data-section="anime">Anime</button>
+                    </nav>
+                </div>
+                <div class="header-center">
+                    <div class="search-container">
+                        <input type="text" id="search-input" class="search-input" placeholder="Search movies and TV shows...">
+                        <button id="search-btn" class="search-btn">🔍</button>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div id="current-user" class="current-user">
+                        <button id="theme-settings-btn" class="theme-settings-btn" title="Theme Settings">🎨</button>
+                        <img id="user-avatar" src="" alt="User Avatar" class="user-avatar-small" title="Click to change avatar" style="cursor: pointer;">
+                        <span id="user-name" class="user-name"></span>
+                        <button id="switch-user-btn" class="switch-user-btn">Switch</button>
+                        <button id="close-app-btn" class="close-app-btn" title="Close Application">&times;</button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <!-- Home Section -->
+                <section id="home-section" class="content-section active">
+                    <!-- Hero Banner -->
+                    <div id="hero-banner" class="hero-banner"></div>
+
+                    <div class="continue-watching">
+                        <h2>Continue Watching</h2>
+                        <div class="genre-carousel-container">
+                            <button class="carousel-arrow carousel-arrow-left" data-target="continue-watching-grid">‹</button>
+                            <div id="continue-watching-grid" class="carousel-content"></div>
+                            <button class="carousel-arrow carousel-arrow-right" data-target="continue-watching-grid">›</button>
+                        </div>
+                    </div>
+
+                    <div class="trending-section">
+                        <h2>Trending Now</h2>
+                        <div class="genre-carousel-container">
+                            <button class="carousel-arrow carousel-arrow-left" data-target="trending-grid">‹</button>
+                            <div id="trending-grid" class="carousel-content"></div>
+                            <button class="carousel-arrow carousel-arrow-right" data-target="trending-grid">›</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Movies Section -->
+                <section id="movies-section" class="content-section">
+                    <h2>Movies</h2>
+                    <div class="category-controls">
+                        <div class="main-category-pills" id="movie-main-categories"></div>
+                        <div class="sub-category-pills" id="movie-sub-categories"></div>
+                        <div class="sort-options">
+                            <label for="movies-sort">Sort by:</label>
+                            <select id="movies-sort" class="sort-dropdown">
+                                <option value="popular">Popular</option>
+                                <option value="release_date.desc">Newest</option>
+                                <option value="vote_average.desc">Highest Rated</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="movie-genre-sections-container">
+                        <!-- Movie category rows will be populated here -->
+                    </div>
+                </section>
+
+                <!-- TV Shows Section -->
+                <section id="tv-section" class="content-section">
+                    <h2>TV Shows</h2>
+                    <div class="category-controls">
+                        <div class="main-category-pills" id="tv-main-categories"></div>
+                        <div class="sub-category-pills" id="tv-sub-categories"></div>
+                        <div class="sort-options">
+                            <label for="tv-sort">Sort by:</label>
+                            <select id="tv-sort" class="sort-dropdown">
+                                <option value="popular">Popular</option>
+                                <option value="first_air_date.desc">Newest</option>
+                                <option value="vote_average.desc">Highest Rated</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="tv-genre-sections-container">
+                        <!-- TV category rows will be populated here -->
+                    </div>
+                </section>
+
+                <!-- Anime Section -->
+                <section id="anime-section" class="content-section">
+                    <h2>Anime</h2>
+                    <div class="category-controls">
+                        <div class="main-category-pills" id="anime-category-pills"></div>
+                    </div>
+                    <div id="anime-content-container"></div>
+                </section>
+
+                <!-- Genre List Section -->
+                <section id="genre-list-section" class="content-section">
+                    <div class="genre-header">
+                        <button id="back-to-section-btn" class="back-btn">← Back</button>
+                        <h2 id="genre-title">Action Movies</h2>
+                    </div>
+                    <div class="genre-content">
+                        <div class="genre-controls">
+                            <div class="sort-options">
+                                <label for="genre-sort">Sort by:</label>
+                                <select id="genre-sort" class="sort-dropdown">
+                                    <option value="popular">Popular</option>
+                                    <option value="release_date.desc">Newest</option>
+                                    <option value="release_date.asc">Oldest</option>
+                                    <option value="vote_average.desc">Highest Rated</option>
+                                    <option value="title.asc">A-Z</option>
+                                    <option value="title.desc">Z-A</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="genre-list-grid" class="genre-list-grid">
+                            <!-- Genre content will be populated here -->
+                        </div>
+                        <div class="pagination-controls">
+                            <button id="prev-page-btn" class="pagination-btn" disabled>Previous</button>
+                            <span id="page-info">Page 1 of 1</span>
+                            <button id="next-page-btn" class="pagination-btn" disabled>Next</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Search Results Section -->
+                <section id="search-section" class="content-section">
+                    <h2 id="search-title">Search Results</h2>
+                    <div id="search-grid" class="content-grid">
+                        <!-- Search results will be populated here -->
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- Video Player Modal -->
+        <div id="video-player-modal" class="modal">
+            <div class="modal-content">
+                <div class="video-player-container">
+                    <video id="video-player" controls preload="none" playsinline style="display: none;">
+                        
+                        Your browser does not support the video tag.
+                    </video>
+                    <iframe id="video-iframe" width="100%" height="100%" frameborder="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin" style="display: none;"></iframe>
+                    <div class="video-controls">
+                        <select id="quality-picker" class="quality-picker" style="display:none;" title="Switch Quality"></select>
+                        <div id="dub-toggle" class="dub-toggle" style="display:none;" title="Switch Sub/Dub">
+                            <button class="dub-btn active" id="sub-btn">SUB</button>
+                            <button class="dub-btn" id="dub-btn-el">DUB</button>
+                        </div>
+                        <button id="select-episode-btn" class="select-episode-btn" style="display: none;" title="Select Episode">
+                            📺 Episodes
+                        </button>
+                        <button id="close-player" class="close-btn">&times;</button>
+                    </div>
+                    <div id="stream-reconnect-overlay" class="stream-reconnect-overlay" style="display: none;">
+                        <div class="reconnect-content">
+                            <div class="reconnect-spinner"></div>
+                            <p>Reconnecting stream...</p>
+                        </div>
+                    </div>
+                    <div class="video-overlay-controls">
+                        <button id="skip-intro-btn" class="skip-intro-btn" style="display: none;">
+                            Skip Intro
+                        </button>
+                        <button id="submit-intro-btn" class="submit-intro-btn" style="display: none;">
+                            Set Intro Times
+                        </button>
+                        <div id="next-episode-panel" class="next-episode-panel" style="display: none;">
+                            <div class="next-episode-info">
+                                <h4>Next Episode</h4>
+                                <p id="next-episode-title">Loading...</p>
+                            </div>
+                            <button id="play-next-btn" class="play-next-btn">Play Next</button>
+                            <button id="cancel-next-btn" class="cancel-next-btn">&times;</button>
+                        </div>
+                        <div id="auto-play-countdown" class="auto-play-countdown" style="display: none;">
+                            <div class="countdown-content">
+                                <p>Next episode in <span id="countdown-timer">15</span> seconds</p>
+                                <button id="cancel-auto-play" class="cancel-auto-play">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Intro Times Modal -->
+        <div id="submit-intro-modal" class="modal">
+            <div class="modal-content">
+                <h2>Set Intro Times</h2>
+                <p class="intro-help-text">Help improve intro detection for other users by marking when the intro starts and ends.</p>
+
+                <div class="intro-time-display">
+                    <div class="current-time">
+                        Current time: <span id="current-video-time">0:00</span>
+                    </div>
+                </div>
+
+                <form id="intro-submission-form">
+                    <div class="form-group">
+                        <label for="intro-start-input">Intro Start (seconds):</label>
+                        <div class="time-input-group">
+                            <input type="number" id="intro-start-input" min="0" max="3600" placeholder="e.g., 10">
+                            <button type="button" id="set-intro-start-btn" class="set-time-btn">Set Current Time</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="intro-end-input">Intro End (seconds):</label>
+                        <div class="time-input-group">
+                            <input type="number" id="intro-end-input" min="0" max="3600" placeholder="e.g., 90">
+                            <button type="button" id="set-intro-end-btn" class="set-time-btn">Set Current Time</button>
+                        </div>
+                    </div>
+
+                    <div class="intro-preview" id="intro-preview" style="display: none;">
+                        <h4>Preview:</h4>
+                        <p>Intro will be from <span id="preview-start">0</span>s to <span id="preview-end">0</span>s</p>
+                        <p>Duration: <span id="preview-duration">0</span> seconds</p>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="cancel-intro-submission">Cancel</button>
+                        <button type="submit" id="submit-intro-times">Submit Intro Times</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create/Edit Playlist Modal -->
+        <div id="playlist-modal" class="modal">
+            <div class="modal-content">
+                <h2 id="playlist-modal-title">Create Playlist</h2>
+                <form id="playlist-form">
+                    <div class="form-group">
+                        <label for="playlist-name-input">Name:</label>
+                        <input type="text" id="playlist-name-input" required maxlength="50" placeholder="Enter playlist name">
+                    </div>
+                    <div class="form-group">
+                        <label for="playlist-description-input">Description (optional):</label>
+                        <textarea id="playlist-description-input" maxlength="200" placeholder="Enter playlist description" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-playlist">Cancel</button>
+                        <button type="submit" id="save-playlist">Create Playlist</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add to Playlist Modal -->
+        <div id="add-to-playlist-modal" class="modal">
+            <div class="modal-content">
+                <h2>Add to Playlist</h2>
+                <div class="form-group">
+                    <label>Select Playlist:</label>
+                    <div id="playlist-selection" class="playlist-selection">
+                        <!-- Playlists will be populated here -->
+                    </div>
+                    <button type="button" id="create-new-playlist-btn" class="create-new-playlist-btn">+ Create New Playlist</button>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-add-to-playlist">Cancel</button>
+                    <button type="button" id="confirm-add-to-playlist">Add to Playlist</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Playlists Modal -->
+        <div id="manage-playlists-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage Playlists</h2>
+                    <button id="close-manage-playlists" class="close-btn">&times;</button>
+                </div>
+                <div class="manage-playlists-content">
+                    <button id="create-new-playlist-manage-btn" class="create-new-playlist-btn" style="margin-bottom: 1rem; width: 100%;">+ Create New Playlist</button>
+                    <div id="manage-playlists-list" class="manage-playlists-list">
+                        <!-- Playlists will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Playlist View Modal -->
+        <div id="playlist-view-modal" class="modal">
+            <div class="modal-content playlist-view-content">
+                <div class="playlist-header">
+                    <div class="playlist-info">
+                        <h2 id="playlist-view-title">Playlist Name</h2>
+                        <p id="playlist-view-description">Playlist description</p>
+                        <span id="playlist-view-count">0 items</span>
+                    </div>
+                    <div class="playlist-actions">
+                        <button id="edit-playlist-btn" class="edit-playlist-btn">Edit</button>
+                        <button id="delete-playlist-btn" class="delete-playlist-btn">Delete</button>
+                        <button id="close-playlist-view" class="close-btn">&times;</button>
+                    </div>
+                </div>
+                <div id="playlist-items" class="playlist-items">
+                    <!-- Playlist items will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Theme Settings Modal -->
+        <div id="theme-settings-modal" class="modal">
+            <div class="modal-content">
+                <h2>Theme Settings</h2>
+                <div class="form-group">
+                    <label>Choose Theme:</label>
+                    <div class="theme-selection" id="theme-settings-selection">
+                        <div class="theme-option" data-theme="default">
+                            <div class="theme-preview theme-default"></div>
+                            <span>Default</span>
+                        </div>
+                        <div class="theme-option" data-theme="dark-blue">
+                            <div class="theme-preview theme-dark-blue"></div>
+                            <span>Dark Blue</span>
+                        </div>
+                        <div class="theme-option" data-theme="purple">
+                            <div class="theme-preview theme-purple"></div>
+                            <span>Purple</span>
+                        </div>
+                        <div class="theme-option" data-theme="green">
+                            <div class="theme-preview theme-green"></div>
+                            <span>Green</span>
+                        </div>
+                        <div class="theme-option" data-theme="orange">
+                            <div class="theme-preview theme-orange"></div>
+                            <span>Orange</span>
+                        </div>
+                        <div class="theme-option" data-theme="red">
+                            <div class="theme-preview theme-red"></div>
+                            <span>Red</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-theme-settings">Cancel</button>
+                    <button type="button" id="apply-theme-settings">Apply Theme</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Detail Modal -->
+        <div id="content-detail-modal" class="modal">
+            <div class="modal-content content-detail-content">
+                <button class="close-modal" id="close-detail-modal">&times;</button>
+                <div class="content-detail-body">
+                    <div class="content-detail-poster">
+                        <img id="detail-poster" src="" alt="Poster">
+                    </div>
+                    <div class="content-detail-info">
+                        <h2 id="detail-title"></h2>
+                        <div id="detail-meta" class="detail-meta"></div>
+                        <p id="detail-overview" class="detail-overview"></p>
+
+                        <!-- Movie Progress Bar -->
+                        <div id="detail-movie-progress" class="detail-movie-progress" style="display: none;">
+                            <div class="detail-movie-progress-label">
+                                <span id="detail-movie-progress-text">Watched: 0%</span>
+                            </div>
+                            <div class="detail-movie-progress-bar">
+                                <div id="detail-movie-progress-fill" class="detail-movie-progress-fill"></div>
+                            </div>
+                        </div>
+
+                        <!-- Episode Selection (TV Shows only) -->
+                        <div id="detail-episodes-section" class="detail-episodes-section" style="display: none;">
+                            <h3>Episodes</h3>
+                            <div class="detail-season-selector">
+                                <label for="detail-season-dropdown">Season:</label>
+                                <select id="detail-season-dropdown" class="detail-season-dropdown"></select>
+                                <button id="detail-continue-btn" class="detail-continue-btn">▶ Continue Watching</button>
+                            </div>
+                            <div id="detail-episodes-grid" class="detail-episodes-grid">
+                                <!-- Episodes will be loaded here -->
+                            </div>
+                        </div>
+
+                        <div class="detail-actions">
+                            <button id="detail-play-btn" class="detail-play-btn">▶ Play</button>
+                            <button id="detail-add-playlist-btn" class="detail-secondary-btn">+ Add to Playlist</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New User Modal -->
+        <div id="new-user-modal" class="modal">
+            <div class="modal-content">
+                <h2>Create New User</h2>
+                <form id="new-user-form">
+                    <div class="form-group">
+                        <label for="user-name-input">Name:</label>
+                        <input type="text" id="user-name-input" required maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="user-password-input">Password:</label>
+                        <input type="password" id="user-password-input" maxlength="50" placeholder="Leave blank for no password">
+                        <small style="color: rgba(255, 255, 255, 0.6); font-size: 0.85rem; display: block; margin-top: 0.25rem;">Optional: Leave blank for no password protection</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Avatar:</label>
+                        <div class="avatar-selection">
+                            <div class="avatar-option selected" data-avatar="https://api.dicebear.com/9.x/avataaars/svg?seed=felix">
+                                <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=felix" alt="Avatar 1">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/big-smile/svg?seed=happy">
+                                <img src="https://api.dicebear.com/9.x/big-smile/svg?seed=happy" alt="Avatar 2">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/fun-emoji/svg?seed=cool">
+                                <img src="https://api.dicebear.com/9.x/fun-emoji/svg?seed=cool" alt="Avatar 3">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/notionists/svg?seed=alex">
+                                <img src="https://api.dicebear.com/9.x/notionists/svg?seed=alex" alt="Avatar 4">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/open-peeps/svg?seed=charlie">
+                                <img src="https://api.dicebear.com/9.x/open-peeps/svg?seed=charlie" alt="Avatar 5">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/personas/svg?seed=jordan">
+                                <img src="https://api.dicebear.com/9.x/personas/svg?seed=jordan" alt="Avatar 6">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/lorelei/svg?seed=morgan">
+                                <img src="https://api.dicebear.com/9.x/lorelei/svg?seed=morgan" alt="Avatar 7">
+                            </div>
+                            <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/croodles/svg?seed=sam">
+                                <img src="https://api.dicebear.com/9.x/croodles/svg?seed=sam" alt="Avatar 8">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Theme:</label>
+                        <div class="theme-selection">
+                            <div class="theme-option selected" data-theme="default">
+                                <div class="theme-preview theme-default"></div>
+                                <span>Default</span>
+                            </div>
+                            <div class="theme-option" data-theme="dark-blue">
+                                <div class="theme-preview theme-dark-blue"></div>
+                                <span>Dark Blue</span>
+                            </div>
+                            <div class="theme-option" data-theme="purple">
+                                <div class="theme-preview theme-purple"></div>
+                                <span>Purple</span>
+                            </div>
+                            <div class="theme-option" data-theme="green">
+                                <div class="theme-preview theme-green"></div>
+                                <span>Green</span>
+                            </div>
+                            <div class="theme-option" data-theme="orange">
+                                <div class="theme-preview theme-orange"></div>
+                                <span>Orange</span>
+                            </div>
+                            <div class="theme-option" data-theme="red">
+                                <div class="theme-preview theme-red"></div>
+                                <span>Red</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-user">Cancel</button>
+                        <button type="submit">Create User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Admin User Management Modal -->
+        <div id="admin-users-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage Users</h2>
+                    <button id="close-admin-users" class="close-btn">&times;</button>
+                </div>
+                <div class="manage-users-content">
+                    <button id="create-admin-user-btn" class="create-new-playlist-btn" style="margin-bottom: 1rem; width: 100%;">+ Create New User</button>
+                    <div id="admin-users-list" class="manage-playlists-list">
+                        <!-- Users will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Password Prompt Modal -->
+        <div id="password-prompt-modal" class="modal">
+            <div class="modal-content">
+                <h2>Enter Password</h2>
+                <p id="password-prompt-user">Enter password for user:</p>
+                <form id="password-prompt-form">
+                    <div class="form-group">
+                        <label for="password-prompt-input">Password:</label>
+                        <input type="password" id="password-prompt-input" required autofocus>
+                        <small id="password-error" style="color: #ef4444; font-size: 0.85rem; display: none; margin-top: 0.5rem;">Incorrect password. Please try again.</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-password-prompt">Cancel</button>
+                        <button type="submit">Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Change Avatar Modal -->
+        <div id="change-avatar-modal" class="modal">
+            <div class="modal-content">
+                <h2>Change Avatar</h2>
+                <div class="form-group">
+                    <label>Choose Avatar:</label>
+                    <div class="avatar-selection" id="change-avatar-selection">
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/avataaars/svg?seed=felix">
+                            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=felix" alt="Avatar 1">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/big-smile/svg?seed=happy">
+                            <img src="https://api.dicebear.com/9.x/big-smile/svg?seed=happy" alt="Avatar 2">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/fun-emoji/svg?seed=cool">
+                            <img src="https://api.dicebear.com/9.x/fun-emoji/svg?seed=cool" alt="Avatar 3">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/notionists/svg?seed=alex">
+                            <img src="https://api.dicebear.com/9.x/notionists/svg?seed=alex" alt="Avatar 4">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/open-peeps/svg?seed=charlie">
+                            <img src="https://api.dicebear.com/9.x/open-peeps/svg?seed=charlie" alt="Avatar 5">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/personas/svg?seed=jordan">
+                            <img src="https://api.dicebear.com/9.x/personas/svg?seed=jordan" alt="Avatar 6">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/lorelei/svg?seed=morgan">
+                            <img src="https://api.dicebear.com/9.x/lorelei/svg?seed=morgan" alt="Avatar 7">
+                        </div>
+                        <div class="avatar-option" data-avatar="https://api.dicebear.com/9.x/croodles/svg?seed=sam">
+                            <img src="https://api.dicebear.com/9.x/croodles/svg?seed=sam" alt="Avatar 8">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-change-avatar">Cancel</button>
+                    <button type="button" id="save-change-avatar">Save Avatar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HLS.js - native HLS playback for direct stream URLs -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+
+    <!-- ES modules — browser handles import order automatically -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
