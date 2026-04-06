@@ -362,7 +362,8 @@ async function fetchIntroTimes() {
             state.player.contentId,
             state.player.season,
             state.player.episode,
-            state.player.tmdbId
+            state.player.tmdbId,
+            state.player.type
         );
         introTimes  = (data?.intro_start != null)  ? data : null;
         endingTimes = (data?.ending_start != null)  ? data : null;

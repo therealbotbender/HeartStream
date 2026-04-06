@@ -166,6 +166,10 @@ function createTables() {
       UNIQUE(user_id, content_type)
     )`);
 
+    // Migrate: add ending columns to intro cache if they don't exist yet
+    db.run(`ALTER TABLE intro_detection_cache ADD COLUMN ending_start INTEGER`, () => {});
+    db.run(`ALTER TABLE intro_detection_cache ADD COLUMN ending_end INTEGER`, () => {});
+
     // Create default Admin account after all tables are created
     db.run(`SELECT 1`, () => {
       ensureDefaultAdmin().catch(err => {
@@ -684,17 +688,17 @@ function getCachedIntroData(contentId, seasonNumber = null, episodeNumber = null
   });
 }
 
-function setCachedIntroData(contentId, seasonNumber, episodeNumber, introStart, introEnd, source, confidence = 1.0, apiResponse = null, expiresInHours = 24) {
+function setCachedIntroData(contentId, seasonNumber, episodeNumber, introStart, introEnd, source, confidence = 1.0, apiResponse = null, expiresInHours = 24, endingStart = null, endingEnd = null) {
   return new Promise((resolve, reject) => {
     const expiresAt = expiresInHours ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString() : null;
 
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO intro_detection_cache
-      (content_id, season_number, episode_number, intro_start, intro_end, source, confidence, api_response, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (content_id, season_number, episode_number, intro_start, intro_end, ending_start, ending_end, source, confidence, api_response, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run([contentId, seasonNumber, episodeNumber, introStart, introEnd, source, confidence, apiResponse, expiresAt], function(err) {
+    stmt.run([contentId, seasonNumber, episodeNumber, introStart, introEnd, endingStart, endingEnd, source, confidence, apiResponse, expiresAt], function(err) {
       if (err) {
         reject(err);
       } else {

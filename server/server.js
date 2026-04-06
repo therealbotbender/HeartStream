@@ -6,8 +6,11 @@ const http = require('http');
 const axios = require('axios');
 const db = require('./database');
 const ContentService = require('./api/contentService');
+const TMDBService    = require('./api/tmdb');
 const streamResolver = require('./services/streamResolver');
 const anilist = require('./api/anilist');
+
+const tmdb = new TMDBService();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -488,55 +491,108 @@ app.get('/api/intro/:contentId', async (req, res) => {
         const season    = req.query.season  ? parseInt(req.query.season)  : null;
         const episode   = req.query.episode ? parseInt(req.query.episode) : null;
         const tmdbId    = req.query.tmdbId  ? parseInt(req.query.tmdbId)  : null;
+        const type      = req.query.type    || 'tv';
 
-        // Check persistent cache first
+        // 1. Persistent cache
         const cached = await db.getCachedIntroData(contentId, season, episode);
         if (cached) return res.json({
-            intro_start:   cached.intro_start,
-            intro_end:     cached.intro_end,
-            ending_start:  cached.ending_start ?? null,
-            ending_end:    cached.ending_end   ?? null,
-            source:        cached.source
+            intro_start:  cached.intro_start,
+            intro_end:    cached.intro_end,
+            ending_start: cached.ending_start ?? null,
+            ending_end:   cached.ending_end   ?? null,
+            source:       cached.source
         });
 
-        // Fall back to best community submission
+        // 2. Community submissions
         const sub = await db.getUserIntroSubmissions(contentId, season, episode);
         if (sub) return res.json({ intro_start: sub.intro_start, intro_end: sub.intro_end, ending_start: null, ending_end: null, source: 'community' });
 
-        // Try AniSkip (anime only) — needs tmdbId + episode
-        if (tmdbId && episode) {
+        // Helper: cache result and send response
+        const cacheAndReturn = async (result, source) => {
+            if (result.intro_start != null) {
+                await db.setCachedIntroData(
+                    contentId, season, episode,
+                    result.intro_start, result.intro_end,
+                    source, 0.9, null, 168,
+                    result.ending_start ?? null, result.ending_end ?? null
+                ).catch(() => {});
+            }
+            return res.json({ ...result, source });
+        };
+
+        // 3. TheIntroDB — TMDB-native, covers intro/recap/credits/preview
+        if (tmdbId && process.env.TIDB_TOKEN) {
             try {
-                const armRes  = await axios.get(`https://arm.haglund.dev/api/v2/ids?source=tmdb&id=${tmdbId}`, { timeout: 5000 });
-                const malId   = armRes.data?.myanimelist;
+                const params = new URLSearchParams({ tmdb_id: tmdbId });
+                if (season  != null) params.set('season', season);
+                if (episode != null) params.set('episode', episode);
+                const tidbRes = await axios.get(
+                    `https://api.theintrodb.org/v2/media?${params}`,
+                    { headers: { Authorization: `Bearer ${process.env.TIDB_TOKEN}` }, timeout: 5000 }
+                );
+                if (tidbRes.status === 200 && tidbRes.data) {
+                    const d       = tidbRes.data;
+                    const intro   = d.intro?.[0];
+                    const credits = d.credits?.[0];
+                    if (intro) {
+                        return cacheAndReturn({
+                            intro_start:  Math.floor(intro.start_ms   / 1000),
+                            intro_end:    Math.floor(intro.end_ms     / 1000),
+                            ending_start: credits ? Math.floor(credits.start_ms / 1000) : null,
+                            ending_end:   credits ? Math.floor(credits.end_ms   / 1000) : null,
+                        }, 'tidb');
+                    }
+                }
+            } catch (e) { /* unavailable — try next */ }
+        }
+
+        // 4. IntroDB — no auth, IMDb ID, covers intro + outro
+        if (tmdbId && season != null && episode != null) {
+            try {
+                const extIds = await tmdb.getExternalIds(tmdbId, type);
+                const imdbId = extIds?.imdb_id;
+                if (imdbId) {
+                    const idbRes = await axios.get(
+                        `https://api.introdb.app/segments?imdb_id=${imdbId}&season=${season}&episode=${episode}`,
+                        { timeout: 5000 }
+                    );
+                    if (idbRes.status === 200 && idbRes.data?.intro) {
+                        const d = idbRes.data;
+                        return cacheAndReturn({
+                            intro_start:  d.intro.start_sec,
+                            intro_end:    d.intro.end_sec,
+                            ending_start: d.outro?.start_sec ?? null,
+                            ending_end:   d.outro?.end_sec   ?? null,
+                        }, 'introdb');
+                    }
+                }
+            } catch (e) { /* unavailable — try next */ }
+        }
+
+        // 5. AniSkip — anime only, MAL ID via ARM mapping
+        if (tmdbId && episode != null) {
+            try {
+                const armRes = await axios.get(`https://arm.haglund.dev/api/v2/ids?source=tmdb&id=${tmdbId}`, { timeout: 5000 });
+                const malId  = armRes.data?.myanimelist;
                 if (malId) {
-                    const skipRes  = await axios.get(
+                    const skipRes = await axios.get(
                         `https://api.aniskip.com/v2/skip-times/${malId}/${episode}?types=op&types=ed`,
                         { timeout: 5000 }
                     );
                     if (skipRes.data?.found) {
                         const op = skipRes.data.results.find(r => r.skipType === 'op');
                         const ed = skipRes.data.results.find(r => r.skipType === 'ed');
-                        const result = {
-                            intro_start:  op ? Math.floor(op.interval.startTime) : null,
-                            intro_end:    op ? Math.floor(op.interval.endTime)   : null,
-                            ending_start: ed ? Math.floor(ed.interval.startTime) : null,
-                            ending_end:   ed ? Math.floor(ed.interval.endTime)   : null,
-                            source: 'aniskip'
-                        };
-                        // Cache for 7 days
-                        if (result.intro_start != null) {
-                            await db.setCachedIntroData(
-                                contentId, season, episode,
-                                result.intro_start, result.intro_end,
-                                'aniskip', 0.9, JSON.stringify(result), 168
-                            );
+                        if (op) {
+                            return cacheAndReturn({
+                                intro_start:  Math.floor(op.interval.startTime),
+                                intro_end:    Math.floor(op.interval.endTime),
+                                ending_start: ed ? Math.floor(ed.interval.startTime) : null,
+                                ending_end:   ed ? Math.floor(ed.interval.endTime)   : null,
+                            }, 'aniskip');
                         }
-                        return res.json(result);
                     }
                 }
-            } catch (e) {
-                // AniSkip unavailable — fall through to null
-            }
+            } catch (e) { /* unavailable */ }
         }
 
         res.json(null);
