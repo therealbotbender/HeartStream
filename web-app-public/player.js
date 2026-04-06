@@ -99,6 +99,14 @@ async function loadDirect(result) {
             if (saved > 0) videoEl.currentTime = saved;
             videoEl.play().catch(() => {});
         }, { once: true });
+        videoEl.addEventListener('error', () => {
+            // Browser can't play the format (usually MKV from RD) — fall back to iframe
+            const { type, tmdbId, season, episode } = state.player;
+            const iframeUrl = type === 'movie'
+                ? `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`
+                : `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
+            loadIframe(iframeUrl);
+        }, { once: true });
     }
 
     hideLoading();
