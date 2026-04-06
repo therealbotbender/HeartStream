@@ -22,7 +22,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/New_York}
-      - RUN_OPTS=--AllowExternal  # <--- Use this instead of the command fix    
+      - RUN_OPTS=-x    
     ports:
       - "9117:9117"
     volumes:
