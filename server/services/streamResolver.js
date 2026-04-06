@@ -105,7 +105,7 @@ async function resolve(content) {
                         console.warn(`[StreamResolver] RD link dead (${rdUrl.slice(0, 80)}…) — skipping stream`);
                         return null;
                     }
-                    console.log(`[StreamResolver] MediaFlow: upgrading ${fileExt} → HLS transcode (nativeUrl available)`);
+                    console.log(`[StreamResolver] serving "${stream.name}" via MediaFlow HLS (${fileExt})`);
                     return {
                         ...stream,
                         url:       toProxyUrl(transcodeUrl),
@@ -139,7 +139,7 @@ async function resolve(content) {
                 console.warn(`[StreamResolver] RD link dead (via redirect) — skipping stream`);
                 return null;
             }
-            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode (nativeUrl available)`);
+            console.log(`[StreamResolver] serving "${stream.name}" via MediaFlow HLS redirect (${resolvedExt})`);
             return {
                 ...stream,
                 url:       toProxyUrl(transcodeUrl),
@@ -151,7 +151,7 @@ async function resolve(content) {
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
         const mimeType = filename.endsWith('.m3u8') ? 'hls' : 'mp4';
 
-        console.log(`[StreamResolver] resolved: ${filename}`);
+        console.log(`[StreamResolver] serving "${stream.name}" direct (${filename})`);
         return { ...stream, url: finalUrl, mimeType };
     } catch (err) {
         console.error('[StreamResolver]', err.message);
