@@ -119,7 +119,14 @@ async function resolve(content) {
             const finalUrl = await resolveRedirect(unwrapped);
             if (!finalUrl) { console.warn(`[StreamResolver] dead link for "${name}" — trying next`); continue; }
 
-            const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
+            // 4. Validate the actual CDN filename — this is ground truth even when the
+            //    stream label is generic (e.g. "[RD] Jackettio 1080p" hiding wrong content)
+            const filename = decodeURIComponent(finalUrl.split('/').pop().split('?')[0]);
+            if (!titleMatchesStream(expectedTitle, filename)) {
+                console.warn(`[StreamResolver] CDN filename mismatch: "${filename}" ≠ "${expectedTitle}" — trying next`);
+                continue;
+            }
+
             console.log(`[StreamResolver] serving "${name}" → ${filename}`);
 
             // Cache this winning result so the next call skips the search
