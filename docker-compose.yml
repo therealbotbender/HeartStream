@@ -1,5 +1,17 @@
 services:
 
+  # ── FlareSolverr ──────────────────────────────────────────────────────────────
+  # Bypasses Cloudflare protection on indexers. Jackett detects it automatically
+  # once configured: Settings → FlareSolverr API URL → http://flaresolverr:8191
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+    networks:
+      - heartstream-network
+
   # ── Jackett ───────────────────────────────────────────────────────────────────
   # Torrent indexer proxy — required by Jackettio to query TPB, YTS, EZTV, etc.
   jackett:
@@ -25,6 +37,7 @@ services:
     restart: unless-stopped
     depends_on:
       - jackett
+      - flaresolverr
     environment:
       - PORT=4000
       - JACKETT_URL=http://jackett:9117
