@@ -17,21 +17,13 @@ const TMDBService = require('../api/tmdb');
 const jackettio = new JackettioProvider();
 const tmdb      = new TMDBService();
 
-// Public HTTPS URL the browser should use to reach MediaFlow.
-// Set MEDIAFLOW_BROWSER_URL in .env when the internal MediaFlow address
-// (used server-side) differs from the browser-accessible address, e.g. when
-// the app is served over HTTPS but MediaFlow is on an internal HTTP address.
-const MEDIAFLOW_BROWSER_URL = (process.env.MEDIAFLOW_BROWSER_URL || '').replace(/\/$/, '');
-
-function toBrowserUrl(url) {
-    if (!MEDIAFLOW_BROWSER_URL) return url;
+// Route MediaFlow URLs through the Node.js server's /api/mf proxy so the
+// browser never needs to reach MediaFlow directly (avoids mixed-content and
+// keeps MediaFlow off the public internet).
+function toProxyUrl(url) {
     try {
         const u = new URL(url);
-        const b = new URL(MEDIAFLOW_BROWSER_URL);
-        u.protocol = b.protocol;
-        u.hostname = b.hostname;
-        u.port     = b.port || '';
-        return u.toString();
+        return '/api/mf' + u.pathname + u.search;
     } catch {
         return url;
     }
@@ -93,7 +85,7 @@ async function resolve(content) {
                 }
             }
 
-            return { ...stream, url: toBrowserUrl(finalUrl), mimeType };
+            return { ...stream, url: toProxyUrl(finalUrl), mimeType };
         }
 
         // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
@@ -106,11 +98,11 @@ async function resolve(content) {
             const native = ['mp4', 'webm', 'mov'].includes(resolvedExt);
             if (native) {
                 console.log(`[StreamResolver] MediaFlow (via redirect): native ${resolvedExt}`);
-                return { ...stream, url: toBrowserUrl(finalUrl), mimeType: 'mp4' };
+                return { ...stream, url: toProxyUrl(finalUrl), mimeType: 'mp4' };
             }
             const hlsUrl = finalUrl.replace('/proxy/stream', '/proxy/hls/manifest.m3u8');
             console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS`);
-            return { ...stream, url: toBrowserUrl(hlsUrl), mimeType: 'hls' };
+            return { ...stream, url: toProxyUrl(hlsUrl), mimeType: 'hls' };
         }
 
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();

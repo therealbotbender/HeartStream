@@ -157,6 +157,45 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
     return res.json({ success: false, fallback: true, sources: fallbackSources });
 });
 
+// ── MediaFlow internal proxy ──────────────────────────────────────────────────
+// Forwards /api/mf/* → internal MediaFlow, keeping MediaFlow off the public
+// internet. HLS manifests are rewritten so segment URLs also route through here.
+
+const MEDIAFLOW_INTERNAL = (process.env.MEDIAFLOW_INTERNAL_URL || 'http://mediaflow:8888').replace(/\/$/, '');
+
+app.use('/api/mf', async (req, res) => {
+    const target = MEDIAFLOW_INTERNAL + req.url;
+    try {
+        const headers = {};
+        if (req.headers.range) headers['range'] = req.headers.range;
+
+        const upstream = await fetch(target, { method: req.method, headers,
+            signal: AbortSignal.timeout(30000) });
+
+        res.status(upstream.status);
+        const ct = upstream.headers.get('content-type') || '';
+        res.setHeader('Content-Type', ct);
+        ['content-range', 'accept-ranges', 'cache-control'].forEach(h => {
+            const v = upstream.headers.get(h);
+            if (v) res.setHeader(h, v);
+        });
+
+        if (req.method === 'HEAD') return res.end();
+
+        // Rewrite absolute internal MediaFlow URLs → /api/mf/... so all HLS
+        // segment requests also come through this proxy.
+        if (ct.includes('mpegurl') || req.url.includes('.m3u8')) {
+            const body = (await upstream.text()).replaceAll(MEDIAFLOW_INTERNAL, '/api/mf');
+            return res.send(body);
+        }
+
+        upstream.body.pipe(res);
+    } catch (err) {
+        console.error('[MF proxy]', err.message);
+        if (!res.headersSent) res.status(502).end();
+    }
+});
+
 // ── FFmpeg remux proxy ────────────────────────────────────────────────────────
 // Remuxes any container (MKV, etc.) to fragmented MP4 on-the-fly so the
 // browser <video> tag can play it. Video is stream-copied (no re-encode);
