@@ -1,24 +1,5 @@
 services:
 
-  # ── Jackett ───────────────────────────────────────────────────────────────────
-  # Torrent indexer proxy. Pre-seeded with a known API key (see config/jackett/).
-  # After first deploy, visit http://your-server:9117 to add indexers:
-  #   Recommended: The Pirate Bay, YTS, EZTV, TheRARBG
-  jackett:
-    image: lscr.io/linuxserver/jackett:latest
-    container_name: jackett
-    restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=${TZ:-America/New_York}
-    volumes:
-      - /opt/heartstream/jackett:/config
-    ports:
-      - "9117:9117"
-    networks:
-      - heartstream-network
-
   # ── MediaFlow Proxy ───────────────────────────────────────────────────────────
   # Proxies and remuxes RD streams to HLS so the browser <video> tag can play
   # any format (MKV, AVI, etc.) natively. Exposed on port 8888.
@@ -31,22 +12,20 @@ services:
       - "8888:8888"
     environment:
       - API_PASSWORD=${MEDIAFLOW_API_PASSWORD:-heartstream}
-      - TRANSCODE_VIDEO_PRESET=ultrafast
+      - TRANSCODE_VIDEO_PRESET=${TRANSCODE_VIDEO_PRESET:-ultrafast}
     networks:
       - heartstream-network
 
   # ── Jackettio ─────────────────────────────────────────────────────────────────
+  # Bridges torrent indexers + Real-Debrid into a single stream API.
   jackettio:
     build: https://github.com/arvida42/jackettio.git
     container_name: jackettio
     restart: unless-stopped
     depends_on:
-      - jackett
       - mediaflow
     environment:
       - PORT=4000
-      - JACKETT_URL=http://jackett:9117
-      - JACKETT_API_KEY=${JACKETT_API_KEY:-5984118c7b886ba38420de8b0208f87c}
       - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
       - DATA_FOLDER=/data
     volumes:
@@ -62,7 +41,6 @@ services:
     container_name: heartstream-v2
     restart: unless-stopped
     depends_on:
-      - jackett
       - jackettio
       - mediaflow
     ports:
@@ -76,7 +54,9 @@ services:
       - REALDEBRID_API_KEY=${REALDEBRID_API_KEY}
       - JACKETTIO_INDEXERS=${JACKETTIO_INDEXERS:-thepiratebay,yts,eztv,therarbg}
       - JACKETTIO_QUALITIES=${JACKETTIO_QUALITIES:-720,1080,2160}
+      - JACKETTIO_BLACKLIST=${JACKETTIO_BLACKLIST:-}
       - MEDIAFLOW_PUBLIC_URL=${MEDIAFLOW_PUBLIC_URL:-}
+      - MEDIAFLOW_INTERNAL_URL=${MEDIAFLOW_INTERNAL_URL:-http://mediaflow:8888}
       - MEDIAFLOW_API_PASSWORD=${MEDIAFLOW_API_PASSWORD:-heartstream}
     volumes:
       - heartstream-data:/data
