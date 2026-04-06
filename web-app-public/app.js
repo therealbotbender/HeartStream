@@ -566,24 +566,29 @@ async function openContentDetail(contentId, type) {
         API.streams.tv(tmdbId, s, e).catch(() => {});
     }
 
-    // Play button label
-    updatePlayButtonLabel(contentId, type);
+    // Play button label + action
+    const lastWatched = state.continueWatching?.find(c => c.content_id === contentId);
+    updatePlayButtonLabel(contentId, type, lastWatched);
 
     document.getElementById('detail-play-btn').onclick = () => {
         modal.classList.remove('active');
         if (type === 'movie') {
             play(contentId, 'movie', tmdbId);
         } else {
-            // Default to last-watched or S1E1
-            const s = state.genreList?.season || 1;
-            const e = state.genreList?.episode || 1;
+            const s = lastWatched?.season_number  || 1;
+            const e = lastWatched?.episode_number || 1;
             play(contentId, 'tv', tmdbId, s, e);
         }
     };
 }
 
-async function updatePlayButtonLabel(contentId, type) {
+async function updatePlayButtonLabel(contentId, type, lastWatched) {
     const btn = document.getElementById('detail-play-btn');
+    if (type === 'tv') {
+        btn.textContent = lastWatched ? '▶ Continue Watching' : '▶ Play';
+        return;
+    }
+    // Movie
     if (!state.currentUser) { btn.textContent = '▶ Play'; return; }
     const p = await API.progress.get(state.currentUser.id, contentId).catch(() => null);
     if (!p?.progress_time) btn.textContent = '▶ Play';
