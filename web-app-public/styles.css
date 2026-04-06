@@ -952,40 +952,41 @@ body {
 
 /* Content Detail Modal */
 .content-detail-content {
-    max-width: 860px;
-    width: 90%;
-    max-height: 90vh;
+    max-width: 560px;
+    width: 95%;
+    max-height: 92vh;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0;
     -webkit-overflow-scrolling: touch;
 }
 
-/* Hero: poster thumbnail + info side-by-side */
+/* Hero: single-column layout */
 .detail-hero {
     display: flex;
-    gap: 1.5rem;
-    align-items: flex-start;
-    padding: 2rem 3.5rem 1.25rem 2rem; /* right padding clears the ✕ button */
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1.5rem 1.25rem;
+    text-align: center;
+    gap: 1rem;
 }
 
 .detail-hero-poster {
     width: 140px;
-    min-width: 140px;
-    border-radius: 8px;
+    border-radius: 10px;
     object-fit: cover;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     flex-shrink: 0;
 }
 
 .detail-hero-info {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
+    text-align: left;
 }
 
 .detail-hero-info h2 {
-    margin: 0 0 0.4rem;
-    font-size: 1.6rem;
+    margin: 0 0 0.3rem;
+    font-size: 1.5rem;
     color: #fff;
     line-height: 1.2;
 }
@@ -1165,9 +1166,7 @@ body {
 .detail-episodes-grid {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    max-height: 400px;
-    overflow-y: auto;
+    gap: 0.4rem;
 }
 
 /* Episode cards (scoped to detail modal) */
@@ -1352,8 +1351,7 @@ body {
     }
 
     .detail-episodes-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        max-height: 300px;
+        gap: 0.3rem;
     }
 
     .detail-actions {
