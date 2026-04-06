@@ -72,6 +72,21 @@ async function resolve(content) {
 
         // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
         const finalUrl = await resolveRedirect(stream.url);
+
+        // Redirect may have resolved to a MediaFlow /proxy/stream URL — upgrade if needed
+        if (finalUrl.includes('/proxy/stream')) {
+            const targetParam = new URL(finalUrl).searchParams.get('d') || '';
+            const resolvedExt = targetParam.toLowerCase().split('?')[0].split('.').pop();
+            const native = ['mp4', 'webm', 'mov'].includes(resolvedExt);
+            if (native) {
+                console.log(`[StreamResolver] MediaFlow (via redirect): native ${resolvedExt}`);
+                return { ...stream, url: finalUrl, mimeType: 'mp4' };
+            }
+            const hlsUrl = finalUrl.replace('/proxy/stream', '/proxy/hls/manifest.m3u8');
+            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS`);
+            return { ...stream, url: hlsUrl, mimeType: 'hls' };
+        }
+
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
         const mimeType = filename.endsWith('.m3u8') ? 'hls' : 'mp4';
 
