@@ -137,6 +137,18 @@ class TMDBService {
         });
     }
 
+    // Get just the title/name for a piece of content — cached in-process
+    async getTitle(tmdbId, type = 'movie') {
+        const key = `title_${type}_${tmdbId}`;
+        if (!this._titleCache) this._titleCache = new Map();
+        if (this._titleCache.has(key)) return this._titleCache.get(key);
+        const endpoint = type === 'movie' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
+        const data = await this.makeRequest(endpoint);
+        const title = data?.title || data?.name || null;
+        this._titleCache.set(key, title);
+        return title;
+    }
+
     // Get external IDs (includes imdb_id) — cached in-process to avoid repeat calls
     async getExternalIds(tmdbId, type = 'movie') {
         const key = `ext_${type}_${tmdbId}`;
