@@ -5861,27 +5861,41 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
 
 /* ═══════════════════════════════════════════════════════
    SIMPLE UI MODE  (body.ui-simple)
+   Matches the standard filter/category row view
    ═══════════════════════════════════════════════════════ */
 
-/* Kill all flip / hover-lift effects */
+/* Flat cards — no 3D perspective or stacking */
+body.ui-simple .content-card {
+    perspective: none;
+    z-index: auto !important;
+}
+
+/* Flatten & freeze the flipper */
 body.ui-simple .card-flipper {
     transform-style: flat;
-    transition: none;
+    transition: none !important;
 }
 
+/* No lift on hover */
 body.ui-simple .content-card:hover .card-flipper {
-    transform: none;
-    box-shadow: none;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-/* Simple hover: just a subtle brightness dip */
-body.ui-simple .content-card:hover {
-    opacity: 0.82;
+/* Simple hover: highlight border only */
+body.ui-simple .content-card:hover .card-poster {
+    outline: 2px solid rgba(255, 255, 255, 0.45);
+    outline-offset: -2px;
 }
 
-/* Hide back face entirely */
+/* Hide back face — not needed */
 body.ui-simple .card-back {
     display: none;
+}
+
+/* Carousels: clip overflow so cards don't bleed into each other */
+body.ui-simple .carousel-content {
+    overflow-y: hidden;
 }
 
 /* Kill modal expand-from-card animation */
