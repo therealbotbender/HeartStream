@@ -10,6 +10,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/New_York}
+    ports:
+      - "9117:9117"
     volumes:
       - /opt/heartstream/jackett:/config
     networks:
