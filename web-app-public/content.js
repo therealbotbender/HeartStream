@@ -33,22 +33,13 @@ export function buildCard(item) {
 
     return `
         <div class="content-card" data-id="${item.id}" data-type="${item.type}">
-            <div class="card-flipper">
-                <div class="card-poster">
-                    <img src="${poster}" alt="${escapeHtml(item.title)}" loading="lazy"
-                         onerror="this.src='/icons/placeholder.png'">
-                    <div class="card-overlay">
-                        <button class="card-play-btn" title="Play">▶</button>
-                    </div>
-                    ${progressBar}
+            <div class="card-poster">
+                <img src="${poster}" alt="${escapeHtml(item.title)}" loading="lazy"
+                     onerror="this.src='/icons/placeholder.png'">
+                <div class="card-overlay">
+                    <button class="card-play-btn" title="Play">▶</button>
                 </div>
-                <div class="card-back">
-                    <img class="card-back-bg" src="${poster}" alt="" aria-hidden="true">
-                    <div class="card-back-body">
-                        <p class="card-back-title">${escapeHtml(item.title)}</p>
-                        ${year ? `<span class="card-back-year">${year}</span>` : ''}
-                    </div>
-                </div>
+                ${progressBar}
             </div>
             <div class="card-info">
                 <p class="card-title">${escapeHtml(item.title)}</p>
