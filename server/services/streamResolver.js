@@ -54,7 +54,20 @@ async function resolve(content) {
         const stream = await jackettio.getStream({ ...content, imdbId });
         if (!stream) return null;
 
-        const finalUrl = await resolveRedirect(stream.url);
+        let streamUrl = stream.url;
+
+        // Jackettio may still return MediaFlow proxy URLs (from its cached config).
+        // Extract the direct RD URL from the `d=` query param — no transcoding needed.
+        if (streamUrl.includes('/proxy/stream') || streamUrl.includes('/proxy/hls/')) {
+            try {
+                const d = new URL(streamUrl).searchParams.get('d');
+                if (!d) { console.warn('[StreamResolver] MediaFlow URL missing d= param'); return null; }
+                console.log('[StreamResolver] bypassing MediaFlow — using direct RD URL');
+                streamUrl = d;
+            } catch { return null; }
+        }
+
+        const finalUrl = await resolveRedirect(streamUrl);
         if (!finalUrl) return null;
 
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
