@@ -24,6 +24,26 @@ const QUALITIES = (process.env.JACKETTIO_QUALITIES || '720,1080,2160').split(','
 // Quality preference for ranking (lower index = preferred)
 const QUALITY_RANK = [2160, 1080, 720, 480, 360];
 
+// In-memory stream cache — avoids re-searching Jackettio for the same content
+// within a short window (RD cached links stay valid for hours).
+const streamCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function cacheKey(content) {
+    return `${content.imdbId}:${content.type}:${content.seasonNumber || ''}:${content.episodeNumber || ''}`;
+}
+
+function getCached(content) {
+    const entry = streamCache.get(cacheKey(content));
+    if (!entry) return null;
+    if (Date.now() - entry.ts > CACHE_TTL_MS) { streamCache.delete(cacheKey(content)); return null; }
+    return entry.value;
+}
+
+function setCached(content, value) {
+    streamCache.set(cacheKey(content), { value, ts: Date.now() });
+}
+
 // Build the base64 config blob once at startup — Jackettio reads it from the URL path
 function buildConfig() {
     return Buffer.from(JSON.stringify({
@@ -37,7 +57,7 @@ function buildConfig() {
         hideUncached:           true,
         priotizePackTorrents:   2,
         forceCacheNextEpisode:  false,
-        indexerTimeoutSec:      30,
+        indexerTimeoutSec:      8,
         metaLanguage:           '',
         enableMediaFlow:        !!MEDIAFLOW_URL,
         mediaflowProxyUrl:      MEDIAFLOW_URL,
@@ -74,13 +94,16 @@ class JackettioProvider {
         const { imdbId, type } = content;
         if (!imdbId) throw new Error('imdbId is required — convert TMDB ID first');
 
+        const cached = getCached(content);
+        if (cached) { console.log('[Jackettio] cache hit'); return cached; }
+
         const stremioType = type === 'movie' ? 'movie' : 'series';
         const idSegment   = type === 'movie'
             ? imdbId
             : `${imdbId}:${content.seasonNumber || 1}:${content.episodeNumber || 1}`;
 
         const url = `${BASE_URL}/${CONFIG}/stream/${stremioType}/${idSegment}.json`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+        const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
         if (!res.ok) throw new Error(`Jackettio responded ${res.status}`);
 
         const { streams = [] } = await res.json();
@@ -99,7 +122,7 @@ class JackettioProvider {
         direct.sort((a, b) => rankStream(a) - rankStream(b));
         const best = direct[0];
 
-        return {
+        const result = {
             success:    true,
             url:        best.url,
             mimeType:   best.url.endsWith('.m3u8') ? 'hls' : 'mp4',
@@ -107,6 +130,8 @@ class JackettioProvider {
             provider:   'jackettio',
             allStreams:  direct.map(s => ({ url: s.url, name: s.name || s.description || '' }))
         };
+        setCached(content, result);
+        return result;
     }
 }
 
