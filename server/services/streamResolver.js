@@ -17,13 +17,19 @@ const TMDBService = require('../api/tmdb');
 const jackettio = new JackettioProvider();
 const tmdb      = new TMDBService();
 
-// Extensions the browser <video> tag can play natively without remuxing
-const NATIVE_EXTS = ['.mp4', '.webm', '.mov', '.m3u8'];
-
-function isNativePlayable(url) {
-    if (!url) return false;
-    const lower = url.toLowerCase().split('?')[0];
-    return NATIVE_EXTS.some(ext => lower.endsWith(ext));
+// Follow Jackettio's redirect chain to get the actual RD CDN URL.
+// The browser will use this directly — no proxy, no transcode latency.
+async function resolveRedirect(url) {
+    try {
+        const res = await fetch(url, {
+            method:   'HEAD',
+            redirect: 'follow',
+            signal:   AbortSignal.timeout(10000),
+        });
+        return res.url || url;
+    } catch {
+        return url;
+    }
 }
 
 async function resolve(content) {
@@ -41,13 +47,13 @@ async function resolve(content) {
         const stream = await jackettio.getStream({ ...content, imdbId });
         if (!stream) return null;
 
-        // Natively playable (MP4, WebM) — return direct URL
-        if (isNativePlayable(stream.url)) return stream;
+        // Follow Jackettio → RD redirect to get the direct CDN URL
+        const finalUrl = await resolveRedirect(stream.url);
+        const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
+        const mimeType = filename.endsWith('.m3u8') ? 'hls' : 'mp4';
 
-        // MKV or unknown container — route through server-side FFmpeg remux proxy
-        console.log(`[StreamResolver] remuxing via proxy: ${stream.url.split('/').pop()}`);
-        const proxyUrl = `/api/proxy/stream?url=${encodeURIComponent(stream.url)}`;
-        return { ...stream, url: proxyUrl, mimeType: 'mp4' };
+        console.log(`[StreamResolver] resolved: ${filename}`);
+        return { ...stream, url: finalUrl, mimeType };
     } catch (err) {
         console.error('[StreamResolver]', err.message);
         return null;
