@@ -79,7 +79,15 @@ class JackettioProvider {
         if (!res.ok) throw new Error(`Jackettio responded ${res.status}`);
 
         const { streams = [] } = await res.json();
-        const direct = streams.filter(s => s.url?.startsWith('http'));
+
+        // Jackettio builds its download URLs from the incoming request host, which
+        // may resolve to the wrong scheme/port inside Docker. Normalize them to the
+        // correct internal address so our proxy (and FFmpeg) can reach them.
+        const fixUrl = u => u ? u.replace(/^https?:\/\/jackettio(:\d+)?\//i, `${BASE_URL}/`) : u;
+
+        const direct = streams
+            .filter(s => s.url?.startsWith('http'))
+            .map(s => ({ ...s, url: fixUrl(s.url) }));
 
         if (!direct.length) return null;
 

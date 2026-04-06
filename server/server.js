@@ -169,9 +169,11 @@ app.get('/api/proxy/stream', (req, res) => {
     let parsed;
     try { parsed = new URL(url); } catch { return res.status(400).end(); }
 
-    // Only proxy Real-Debrid links
-    if (!parsed.hostname.endsWith('.real-debrid.com') && !parsed.hostname.endsWith('.debrid.it')) {
-        return res.status(403).json({ error: 'Only Real-Debrid URLs may be proxied' });
+    // Only proxy trusted sources: Real-Debrid links and internal Jackettio download URLs
+    const host = parsed.hostname.toLowerCase();
+    const allowed = host === 'jackettio' || host.endsWith('.real-debrid.com') || host.endsWith('.debrid.it');
+    if (!allowed) {
+        return res.status(403).json({ error: 'URL not allowed' });
     }
 
     res.setHeader('Content-Type', 'video/mp4');
