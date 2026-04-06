@@ -5431,7 +5431,7 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #6366f1, #a855f7);
 }
 
-/* ── Cards — poster expands from bottom centre (title stays fixed) ── */
+/* ── Cards — poster lifts up above its own title, no size change ── */
 .content-card {
     cursor: pointer;
     position: relative;
@@ -5439,9 +5439,7 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
 }
 
 .card-poster {
-    transition: transform 0.22s ease, box-shadow 0.22s ease;
-    transform-origin: bottom center;
-    will-change: transform;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .content-card:hover {
@@ -5449,8 +5447,8 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
 }
 
 .content-card:hover .card-poster {
-    transform: scale(1.55);
-    box-shadow: 0 22px 60px rgba(0,0,0,0.88);
+    transform: translateY(-14px);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.75);
 }
 .card-overlay {
     opacity: 0;
