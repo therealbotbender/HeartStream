@@ -34,6 +34,7 @@ function toProxyUrl(url) {
 }
 
 // Follow Jackettio's redirect chain to get the actual RD CDN URL.
+// Returns null if the link is dead (4xx/5xx from RD).
 async function resolveRedirect(url) {
     try {
         const res = await fetch(url, {
@@ -44,9 +45,26 @@ async function resolveRedirect(url) {
         if (res.status >= 300 && res.status < 400) {
             return res.headers.get('location') || url;
         }
+        if (res.status >= 400) {
+            console.warn(`[StreamResolver] resolveRedirect ${res.status} for ${url}`);
+            return null;
+        }
         return res.url || url;
     } catch {
-        return url;
+        return null;
+    }
+}
+
+// Validate a direct RD CDN URL — returns false if RD says the link is dead.
+async function validateRdUrl(url) {
+    try {
+        const res = await fetch(url, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(8000),
+        });
+        return res.ok;
+    } catch {
+        return false;
     }
 }
 
@@ -81,6 +99,12 @@ async function resolve(content) {
                     // Return both transcode URL (universal) and raw RD URL (capable browsers)
                     const transcodeUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
                     const rdUrl = new URL(stream.url).searchParams.get('d') || toProxyUrl(stream.url);
+                    // Validate the RD link before handing it to the client — catches deleted/expired torrents.
+                    const rdOk = await validateRdUrl(rdUrl);
+                    if (!rdOk) {
+                        console.warn(`[StreamResolver] RD link dead (${rdUrl.slice(0, 80)}…) — skipping stream`);
+                        return null;
+                    }
                     console.log(`[StreamResolver] MediaFlow: upgrading ${fileExt} → HLS transcode (nativeUrl available)`);
                     return {
                         ...stream,
@@ -96,6 +120,7 @@ async function resolve(content) {
 
         // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
         const finalUrl = await resolveRedirect(stream.url);
+        if (!finalUrl) return null;
 
         // Redirect may have resolved to a MediaFlow /proxy/stream URL — upgrade if needed
         if (finalUrl.includes('/proxy/stream')) {
@@ -109,6 +134,11 @@ async function resolve(content) {
             const transcodeUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
             // nativeUrl is the raw RD CDN URL — Chrome can stream it directly, no proxy hop
             const rdUrl = new URL(finalUrl).searchParams.get('d') || toProxyUrl(finalUrl);
+            const rdOk = await validateRdUrl(rdUrl);
+            if (!rdOk) {
+                console.warn(`[StreamResolver] RD link dead (via redirect) — skipping stream`);
+                return null;
+            }
             console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode (nativeUrl available)`);
             return {
                 ...stream,
