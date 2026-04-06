@@ -776,11 +776,24 @@ function wireGlobalEvents() {
             if (type === 'movie') play(id, 'movie', tmdbId);
             else openContentDetail(id, type);
         } else if (!card.classList.contains('flipping')) {
+            // Capture position before animation starts
+            const rect = card.getBoundingClientRect();
             card.classList.add('flipping');
+
             setTimeout(() => {
                 card.classList.remove('flipping');
+
+                // Tell the modal where to expand from
+                const modal  = document.getElementById('content-detail-modal');
+                const modalW = Math.min(560, window.innerWidth * 0.95);
+                modal.style.setProperty('--from-x',     (rect.left + rect.width  / 2 - window.innerWidth  / 2) + 'px');
+                modal.style.setProperty('--from-y',     (rect.top  + rect.height / 2 - window.innerHeight / 2) + 'px');
+                modal.style.setProperty('--from-scale', rect.width / modalW);
+                modal.classList.add('card-origin');
+                setTimeout(() => modal.classList.remove('card-origin'), 500);
+
                 openContentDetail(id, type);
-            }, 380);
+            }, 390);
         }
     });
 
