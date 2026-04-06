@@ -431,13 +431,7 @@ async function renderTrendingGrid(mt) {
         ? (data.trending?.movies || [])
         : (data.trending?.tv    || []);
     const cards = items.length ? items.map(buildCard).join('') : '<p class="empty-msg">Nothing trending right now.</p>';
-    container.innerHTML = `
-        <div class="genre-carousel-container">
-            <button class="carousel-arrow carousel-arrow-left" data-target="trending-result-row">‹</button>
-            <div id="trending-result-row" class="carousel-content">${cards}</div>
-            <button class="carousel-arrow carousel-arrow-right" data-target="trending-result-row">›</button>
-        </div>
-    `;
+    container.innerHTML = `<div class="genre-list-grid">${cards}</div>`;
 }
 
 function renderSubRows(mt) {
