@@ -324,9 +324,8 @@ export function closePlayer() {
     clearInterval(countdownTimer);
     hideNextEpisodeUI();
     lastSavedTime = 0;
+    videoEl.pause();  // settle any pending play() promise before HLS.js teardown
     destroyHls();
-
-    videoEl.pause();
     videoEl.muted          = false;
     videoEl.src            = '';
     iframeEl.src           = '';
