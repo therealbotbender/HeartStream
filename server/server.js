@@ -135,6 +135,11 @@ app.get('/api/anime/tag/:tag', async (req, res) => {
     catch (err) { console.error('/api/anime/tag', err.message); res.status(500).json([]); }
 });
 
+// Never let the browser cache stream URLs or intro data — they are session-specific
+// and stale cached URLs play the wrong video on next load.
+app.use('/api/stream', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+app.use('/api/intro',  (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+
 // ── Streams ──────────────────────────────────────────────────────────────────
 
 app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
