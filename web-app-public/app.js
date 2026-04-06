@@ -542,13 +542,17 @@ async function runSearch(query) {
 
 // ── Content detail modal ──────────────────────────────────────────────────────
 
+// Tracks the most-recently-opened contentId so stale async results are discarded.
+let _activeDetailId = null;
+
 async function openContentDetail(contentId, type) {
     const modal  = document.getElementById('content-detail-modal');
     const tmdbId = contentId.split('_')[1] || contentId;
+    _activeDetailId = contentId;
     modal.classList.add('active');
 
-    // Set onclick IMMEDIATELY with correct contentId so clicking Play before
-    // data loads doesn't fire the previous modal's handler (race condition fix).
+    // Set onclick IMMEDIATELY so clicking Play before data loads uses the correct
+    // contentId, not whatever the previous modal had (race condition fix).
     const playBtn = document.getElementById('detail-play-btn');
     playBtn.onclick = () => {
         modal.classList.remove('active');
@@ -558,6 +562,10 @@ async function openContentDetail(contentId, type) {
     };
 
     const data = await API.content.details(type, contentId).catch(() => null);
+
+    // Discard stale results — another modal was opened while this fetch was in flight.
+    if (_activeDetailId !== contentId) return;
+
     if (!data) { modal.classList.remove('active'); return; }
     state.selectedContent = data;
 
@@ -633,9 +641,9 @@ function populateSeasonDropdown(data, contentId, tmdbId) {
         `<option value="${s.seasonNumber}">Season ${s.seasonNumber}</option>`
     ).join('');
 
-    dropdown.addEventListener('change', () => {
+    dropdown.onchange = () => {
         loadEpisodeGrid(contentId, tmdbId, parseInt(dropdown.value));
-    });
+    };
     loadEpisodeGrid(contentId, tmdbId, seasons[0]?.seasonNumber || 1);
 }
 
@@ -644,9 +652,15 @@ async function loadEpisodeGrid(contentId, tmdbId, season) {
     grid.innerHTML = '<p class="loading-msg">Loading episodes...</p>';
 
     const episodes = await API.content.episodes(contentId, season).catch(() => []);
+
+    // Discard if the user opened a different content detail while episodes were loading.
+    if (_activeDetailId !== contentId) return;
+
     const progList = state.currentUser
         ? await API.progress.get(state.currentUser.id, contentId, season).catch(() => [])
         : [];
+
+    if (_activeDetailId !== contentId) return;
 
     const progMap = {};
     if (Array.isArray(progList)) {
