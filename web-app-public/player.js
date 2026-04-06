@@ -73,6 +73,14 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
 
 // ── Direct stream ─────────────────────────────────────────────────────────────
 
+function fallbackToIframe() {
+    const { type, tmdbId, season, episode } = state.player;
+    const url = type === 'movie'
+        ? `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`
+        : `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
+    loadIframe(url);
+}
+
 async function loadDirect(result) {
     state.player.usingFallback = false;
     state.player.allStreams    = result.allStreams || [];
@@ -95,17 +103,18 @@ async function loadDirect(result) {
     } else {
         videoEl.src = result.url;
         videoEl.load();
+
+        let startupTimer = setTimeout(() => fallbackToIframe(), 25000);
+
         videoEl.addEventListener('loadedmetadata', () => {
+            clearTimeout(startupTimer);
             if (saved > 0) videoEl.currentTime = saved;
             videoEl.play().catch(() => {});
         }, { once: true });
+
         videoEl.addEventListener('error', () => {
-            // Browser can't play the format (usually MKV from RD) — fall back to iframe
-            const { type, tmdbId, season, episode } = state.player;
-            const iframeUrl = type === 'movie'
-                ? `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`
-                : `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
-            loadIframe(iframeUrl);
+            clearTimeout(startupTimer);
+            fallbackToIframe();
         }, { once: true });
     }
 

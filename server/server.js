@@ -182,10 +182,14 @@ app.get('/api/proxy/stream', (req, res) => {
 
     const ff = spawn('ffmpeg', [
         '-loglevel', 'error',
+        '-fflags', '+nobuffer+discardcorrupt',
+        '-probesize', '32768',       // don't analyse more than 32KB before starting
+        '-analyzeduration', '0',     // skip stream analysis — start output immediately
         '-i', url,
         '-c:v', 'copy',
-        '-c:a', 'aac', '-b:a', '192k',   // transcode audio → AAC (browser-safe)
+        '-c:a', 'aac', '-b:a', '192k',
         '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+        '-frag_duration', '500000',  // 500ms fragments — first bytes reach browser faster
         '-f', 'mp4',
         'pipe:1'
     ]);
