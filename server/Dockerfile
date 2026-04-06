@@ -2,7 +2,7 @@
 FROM node:18-alpine
 
 # Install wget for health checks and bash for debugging (optional)
-RUN apk add --no-cache wget bash
+RUN apk add --no-cache wget bash ffmpeg
 
 # Set working directory
 WORKDIR /app

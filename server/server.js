@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
+const { spawn } = require('child_process');
 const db = require('./database');
 const ContentService = require('./api/contentService');
 const streamResolver = require('./services/streamResolver');
@@ -154,6 +155,47 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
         episode ? parseInt(episode) : null
     );
     return res.json({ success: false, fallback: true, sources: fallbackSources });
+});
+
+// ── FFmpeg remux proxy ────────────────────────────────────────────────────────
+// Remuxes any container (MKV, etc.) to fragmented MP4 on-the-fly so the
+// browser <video> tag can play it. Video is stream-copied (no re-encode);
+// audio is transcoded to AAC only if needed. Near-zero CPU.
+
+app.get('/api/proxy/stream', (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).end();
+
+    let parsed;
+    try { parsed = new URL(url); } catch { return res.status(400).end(); }
+
+    // Only proxy Real-Debrid links
+    if (!parsed.hostname.endsWith('.real-debrid.com') && !parsed.hostname.endsWith('.debrid.it')) {
+        return res.status(403).json({ error: 'Only Real-Debrid URLs may be proxied' });
+    }
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    const ff = spawn('ffmpeg', [
+        '-loglevel', 'error',
+        '-i', url,
+        '-c:v', 'copy',
+        '-c:a', 'aac', '-b:a', '192k',   // transcode audio → AAC (browser-safe)
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+        '-f', 'mp4',
+        'pipe:1'
+    ]);
+
+    ff.stdout.pipe(res);
+    ff.stderr.on('data', d => console.error('[FFmpeg]', d.toString().trim()));
+    ff.on('error', err => {
+        console.error('[FFmpeg] spawn error:', err.message);
+        if (!res.headersSent) res.status(500).end();
+    });
+
+    req.on('close', () => ff.kill('SIGKILL'));
 });
 
 // ── Users ─────────────────────────────────────────────────────────────────────
