@@ -209,9 +209,10 @@ app.use('/api/mf', (req, res) => {
             });
             upstream.on('end', () => {
                 const body = Buffer.concat(chunks).toString('utf8');
-                // Replace any absolute MediaFlow URL regardless of hostname/IP —
-                // MediaFlow may use its own IP in segment URLs, not the Docker hostname.
-                res.send(body.replace(/https?:\/\/[^/"'\s]+\/proxy\//g, '/api/mf/proxy/'));
+                // Rewrite MediaFlow URLs → /api/mf/ proxy path.
+                // Covers both absolute (https://host/proxy/) and relative (/proxy/) forms,
+                // since transcode playlists use relative segment paths.
+                res.send(body.replace(/(?:https?:\/\/[^/"'\s]+)?\/proxy\//g, '/api/mf/proxy/'));
             });
         } else {
             upstream.pipe(res);
