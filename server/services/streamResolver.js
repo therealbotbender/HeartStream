@@ -8,7 +8,11 @@
  *  2. Call Jackettio → Real-Debrid → direct HTTPS URL
  *  3. Return StreamResult or null (caller falls back to iframe)
  *
- * StreamResult: { success, url, mimeType, name, provider, allStreams[] }
+ * StreamResult: { success, url, mimeType, nativeUrl?, name, provider, allStreams[] }
+ *
+ * nativeUrl is included when the source is a non-native container (e.g. MKV).
+ * Capable browsers (Chrome) can use nativeUrl directly, skipping transcode latency.
+ * Incompatible browsers (Firefox) fall back to url (HLS transcode via MediaFlow).
  */
 
 const JackettioProvider = require('./providers/jackettio');
@@ -30,12 +34,8 @@ function toProxyUrl(url) {
 }
 
 // Follow Jackettio's redirect chain to get the actual RD CDN URL.
-// The browser will use this directly — no proxy, no transcode latency.
 async function resolveRedirect(url) {
     try {
-        // Use redirect:manual so we get the Location header on the first hop
-        // without triggering any upstream HEAD requests on the redirect target.
-        // For Jackettio → MediaFlow chains this avoids a ~1s RD preflight.
         const res = await fetch(url, {
             method:   'HEAD',
             redirect: 'manual',
@@ -71,17 +71,22 @@ async function resolve(content) {
             let mimeType = 'hls';
 
             if (stream.url.includes('/proxy/stream')) {
-                // Inspect the target file — if not natively playable, switch to HLS endpoint
                 const targetParam = new URL(stream.url).searchParams.get('d') || '';
-                const ext = targetParam.toLowerCase().split('?')[0].split('.').pop();
-                const native = ['mp4', 'webm', 'mov'].includes(ext);
+                const fileExt = targetParam.toLowerCase().split('?')[0].split('.').pop();
+                const native = ['mp4', 'webm', 'mov'].includes(fileExt);
 
                 if (native) {
                     mimeType = 'mp4';
                 } else {
-                    // Rewrite /proxy/stream → /proxy/transcode/playlist.m3u8 (MediaFlow FFmpeg → HLS fMP4)
-                    finalUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
-                    console.log(`[StreamResolver] MediaFlow: upgrading ${ext} → HLS transcode`);
+                    // Return both transcode URL (universal) and raw stream URL (capable browsers)
+                    const transcodeUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+                    console.log(`[StreamResolver] MediaFlow: upgrading ${fileExt} → HLS transcode (nativeUrl available)`);
+                    return {
+                        ...stream,
+                        url:       toProxyUrl(transcodeUrl),
+                        mimeType:  'hls',
+                        nativeUrl: toProxyUrl(stream.url),
+                    };
                 }
             }
 
@@ -100,9 +105,14 @@ async function resolve(content) {
                 console.log(`[StreamResolver] MediaFlow (via redirect): native ${resolvedExt}`);
                 return { ...stream, url: toProxyUrl(finalUrl), mimeType: 'mp4' };
             }
-            const hlsUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
-            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode`);
-            return { ...stream, url: toProxyUrl(hlsUrl), mimeType: 'hls' };
+            const transcodeUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode (nativeUrl available)`);
+            return {
+                ...stream,
+                url:       toProxyUrl(transcodeUrl),
+                mimeType:  'hls',
+                nativeUrl: toProxyUrl(finalUrl),
+            };
         }
 
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();

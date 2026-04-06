@@ -89,6 +89,17 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
     }
 }
 
+// ── Codec / container capability detection ────────────────────────────────────
+
+// Returns true if the browser can natively play MKV containers.
+// Chrome on Windows/Mac supports MKV (H.264 and HEVC via OS decoders).
+// Firefox does not — it needs the HLS transcode path.
+function canPlayNativeMkv() {
+    const v = document.createElement('video');
+    return v.canPlayType('video/x-matroska; codecs="avc1.42E01E"') !== '' ||
+           v.canPlayType('video/x-matroska') !== '';
+}
+
 // ── Direct stream ─────────────────────────────────────────────────────────────
 
 function fallbackToIframe() {
@@ -103,6 +114,13 @@ async function loadDirect(result) {
     state.player.usingFallback = false;
     state.player.allStreams    = result.allStreams || [];
 
+    // If server provided a raw stream URL and the browser can play MKV natively,
+    // skip the transcode entirely — near-instant start vs ~12s transcode wait.
+    if (result.nativeUrl && canPlayNativeMkv()) {
+        console.log('[player] native MKV supported — skipping transcode');
+        result = { ...result, url: result.nativeUrl, mimeType: 'mp4' };
+    }
+
     const saved = await getSavedProgress();
 
     destroyHls();
@@ -112,7 +130,7 @@ async function loadDirect(result) {
 
     if (result.mimeType === 'hls' && window.Hls?.isSupported()) {
         currentHls = new Hls({
-            fragLoadingTimeOut:    120000,  // HEVC transcode can take ~50s per segment
+            fragLoadingTimeOut:    120000,  // transcode can take up to ~12s per segment
             fragLoadingMaxRetry:   6,
             fragLoadingRetryDelay: 2000,
         });
