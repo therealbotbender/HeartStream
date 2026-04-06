@@ -1,13 +1,32 @@
 services:
 
+  # ── Jackett ───────────────────────────────────────────────────────────────────
+  # Torrent indexer proxy — required by Jackettio to query TPB, YTS, EZTV, etc.
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - jackett-data:/config
+    networks:
+      - heartstream-network
+
   # ── Jackettio ─────────────────────────────────────────────────────────────────
   # Bridges torrent indexers + Real-Debrid into a single stream API.
   jackettio:
     build: https://github.com/arvida42/jackettio.git
     container_name: jackettio
     restart: unless-stopped
+    depends_on:
+      - jackett
     environment:
       - PORT=4000
+      - JACKETT_URL=http://jackett:9117
+      - JACKETT_API_KEY=${JACKETT_API_KEY:-5984118c7b886ba38420de8b0208f87c}
       - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
       - DATA_FOLDER=/data
     volumes:
@@ -23,6 +42,7 @@ services:
     container_name: heartstream-v2
     restart: unless-stopped
     depends_on:
+      - jackett
       - jackettio
     ports:
       - "3000:3000"
@@ -48,6 +68,7 @@ services:
       start_period: 60s
 
 volumes:
+  jackett-data:
   jackettio-data:
   heartstream-data:
 
