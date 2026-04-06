@@ -430,9 +430,14 @@ async function renderTrendingGrid(mt) {
     const items = mt === 'movie'
         ? (data.trending?.movies || [])
         : (data.trending?.tv    || []);
-    container.innerHTML = `<div class="content-grid cat-grid-content"></div>`;
-    container.querySelector('.cat-grid-content').innerHTML =
-        items.length ? items.map(buildCard).join('') : '<p class="empty-msg">Nothing trending right now.</p>';
+    const cards = items.length ? items.map(buildCard).join('') : '<p class="empty-msg">Nothing trending right now.</p>';
+    container.innerHTML = `
+        <div class="genre-carousel-container">
+            <button class="carousel-arrow carousel-arrow-left" data-target="trending-result-row">‹</button>
+            <div id="trending-result-row" class="carousel-content">${cards}</div>
+            <button class="carousel-arrow carousel-arrow-right" data-target="trending-result-row">›</button>
+        </div>
+    `;
 }
 
 function renderSubRows(mt) {
