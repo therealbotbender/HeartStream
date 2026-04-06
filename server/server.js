@@ -520,6 +520,8 @@ app.get('/api/intro/:contentId', async (req, res) => {
             return res.json({ ...result, source });
         };
 
+        const introLog = (src, msg) => process.stdout.write(`[intro:${contentId} S${season}E${episode}] ${src}: ${msg}\n`);
+
         // 3. TheIntroDB — TMDB-native, covers intro/recap/credits/preview (reads are public)
         if (tmdbId && season != null && episode != null) {
             try {
@@ -530,6 +532,7 @@ app.get('/api/intro/:contentId', async (req, res) => {
                     `https://api.theintrodb.org/v2/media?tmdb_id=${tmdbId}&season=${season}&episode=${episode}`,
                     { headers, timeout: 5000 }
                 );
+                introLog('TIDB', `status=${tidbRes.status} data=${JSON.stringify(tidbRes.data).slice(0,120)}`);
                 if (tidbRes.status === 200 && tidbRes.data) {
                     const d       = tidbRes.data;
                     // response fields may be objects or single-element arrays
@@ -544,7 +547,7 @@ app.get('/api/intro/:contentId', async (req, res) => {
                         }, 'tidb');
                     }
                 }
-            } catch (e) { /* unavailable — try next */ }
+            } catch (e) { introLog('TIDB', `error: ${e.message}`); }
         }
 
         // 4. IntroDB — no auth, IMDb ID, covers intro + outro
@@ -552,11 +555,13 @@ app.get('/api/intro/:contentId', async (req, res) => {
             try {
                 const extIds = await tmdb.getExternalIds(tmdbId, type);
                 const imdbId = extIds?.imdb_id;
+                introLog('IntroDB', `imdb_id=${imdbId}`);
                 if (imdbId) {
                     const idbRes = await axios.get(
                         `https://api.introdb.app/segments?imdb_id=${imdbId}&season=${season}&episode=${episode}`,
                         { timeout: 5000 }
                     );
+                    introLog('IntroDB', `status=${idbRes.status} intro=${JSON.stringify(idbRes.data?.intro)}`);
                     if (idbRes.status === 200 && idbRes.data?.intro) {
                         const d = idbRes.data;
                         return cacheAndReturn({
@@ -593,9 +598,10 @@ app.get('/api/intro/:contentId', async (req, res) => {
                         }
                     }
                 }
-            } catch (e) { /* unavailable */ }
+            } catch (e) { introLog('AniSkip', `error: ${e.message}`); }
         }
 
+        introLog('result', 'null — not found in any source');
         res.json(null);
     } catch (err) {
         console.error('/api/intro GET', err.message);
