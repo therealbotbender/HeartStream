@@ -79,9 +79,9 @@ async function resolve(content) {
                 if (native) {
                     mimeType = 'mp4';
                 } else {
-                    // Rewrite /proxy/stream → /proxy/hls/manifest.m3u8 (MediaFlow transcodes to HLS)
-                    finalUrl = stream.url.replace('/proxy/stream', '/proxy/hls/manifest.m3u8');
-                    console.log(`[StreamResolver] MediaFlow: upgrading ${ext} → HLS`);
+                    // Rewrite /proxy/stream → /proxy/transcode/playlist.m3u8 (MediaFlow FFmpeg → HLS fMP4)
+                    finalUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+                    console.log(`[StreamResolver] MediaFlow: upgrading ${ext} → HLS transcode`);
                 }
             }
 
@@ -100,8 +100,8 @@ async function resolve(content) {
                 console.log(`[StreamResolver] MediaFlow (via redirect): native ${resolvedExt}`);
                 return { ...stream, url: toProxyUrl(finalUrl), mimeType: 'mp4' };
             }
-            const hlsUrl = finalUrl.replace('/proxy/stream', '/proxy/hls/manifest.m3u8');
-            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS`);
+            const hlsUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+            console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode`);
             return { ...stream, url: toProxyUrl(hlsUrl), mimeType: 'hls' };
         }
 
