@@ -91,6 +91,11 @@ function rankStream(stream) {
 }
 
 class JackettioProvider {
+    // Allow streamResolver to update the cache once it has validated the winning stream.
+    cacheResult(content, result) {
+        setCached(content, result);
+    }
+
     async getStream(content) {
         if (!RD_KEY) throw new Error('REALDEBRID_API_KEY is not set');
 
