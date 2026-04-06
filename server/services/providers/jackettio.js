@@ -26,6 +26,8 @@ const QUALITIES = (process.env.JACKETTIO_QUALITIES || '720,1080,2160').split(','
 // e.g. JACKETTIO_BLACKLIST=Star.Wars.Maul.Shadow.Lord,b6318f2df1c3310f31ce519a7feed1dd26ebbde6
 const BLACKLIST = (process.env.JACKETTIO_BLACKLIST || '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+if (BLACKLIST.length) console.log(`[Jackettio] blacklist active: ${BLACKLIST.join(', ')}`);
+else console.warn('[Jackettio] JACKETTIO_BLACKLIST is not set — no torrent filtering active');
 
 // Quality preference for ranking (lower index = preferred)
 const QUALITY_RANK = [2160, 1080, 720, 480, 360];
@@ -124,7 +126,7 @@ class JackettioProvider {
             .map(s => ({ ...s, url: fixUrl(s.url) }))
             .filter(s => {
                 if (!BLACKLIST.length) return true;
-                const haystack = ((s.name || '') + ' ' + (s.url || '')).toLowerCase();
+                const haystack = ((s.name || '') + ' ' + (s.description || '') + ' ' + (s.url || '')).toLowerCase();
                 const blocked = BLACKLIST.find(b => haystack.includes(b));
                 if (blocked) console.log(`[Jackettio] blacklisted stream: ${s.name} (matched "${blocked}")`);
                 return !blocked;
