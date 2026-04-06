@@ -1349,6 +1349,22 @@ body {
     z-index: 1000;
 }
 
+.unmute-btn {
+    position: absolute;
+    bottom: 3.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: all;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.95rem;
+    cursor: pointer;
+    z-index: 1002;
+}
+
 .skip-intro-btn {
     position: absolute;
     bottom: 100px;

@@ -13,7 +13,7 @@ import { API } from './api-client.js';
 import { state } from './state.js';
 
 // DOM refs — resolved once in initPlayer()
-let videoEl, iframeEl, modal, closeBtn, dubToggle, subBtn, dubBtnEl, qualityPicker;
+let videoEl, iframeEl, modal, closeBtn, dubToggle, subBtn, dubBtnEl, qualityPicker, unmuteBtn;
 let progressSaveTimer = null;
 let lastSavedTime     = 0;
 let currentHls        = null;
@@ -28,9 +28,15 @@ export function initPlayer() {
     subBtn        = document.getElementById('sub-btn');
     dubBtnEl      = document.getElementById('dub-btn-el');
     qualityPicker = document.getElementById('quality-picker');
+    unmuteBtn     = document.getElementById('unmute-btn');
 
     closeBtn.addEventListener('click', closePlayer);
     modal.addEventListener('click', e => { if (e.target === modal) closePlayer(); });
+
+    unmuteBtn?.addEventListener('click', () => {
+        videoEl.muted = false;
+        unmuteBtn.style.display = 'none';
+    });
 
     videoEl.addEventListener('pause',  saveProgress);
     videoEl.addEventListener('ended',  onEnded);
@@ -43,6 +49,18 @@ export function initPlayer() {
     document.getElementById('play-next-btn')?.addEventListener('click', playNextEpisode);
     document.getElementById('cancel-next-btn')?.addEventListener('click', cancelNextEpisode);
     document.getElementById('cancel-auto-play')?.addEventListener('click', cancelNextEpisode);
+}
+
+// Attempt to play; if autoplay is blocked, retry muted and show the unmute button.
+function tryPlay() {
+    videoEl.muted = false;
+    videoEl.play().catch(err => {
+        if (err.name === 'NotAllowedError') {
+            videoEl.muted = true;
+            videoEl.play().catch(() => {});
+            if (unmuteBtn) unmuteBtn.style.display = 'block';
+        }
+    });
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
@@ -98,7 +116,7 @@ async function loadDirect(result) {
         currentHls.attachMedia(videoEl);
         currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
             if (saved > 0) videoEl.currentTime = saved;
-            videoEl.play().catch(() => {});
+            tryPlay();
         });
     } else {
         videoEl.src = result.url;
@@ -109,7 +127,7 @@ async function loadDirect(result) {
         videoEl.addEventListener('loadedmetadata', () => {
             clearTimeout(startupTimer);
             if (saved > 0) videoEl.currentTime = saved;
-            videoEl.play().catch(() => {});
+            tryPlay();
         }, { once: true });
 
         videoEl.addEventListener('error', () => {
@@ -309,8 +327,10 @@ export function closePlayer() {
     destroyHls();
 
     videoEl.pause();
+    videoEl.muted          = false;
     videoEl.src            = '';
     iframeEl.src           = '';
+    if (unmuteBtn) unmuteBtn.style.display = 'none';
     videoEl.style.display  = 'none';
     iframeEl.style.display = 'none';
 
