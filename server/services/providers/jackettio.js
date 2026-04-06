@@ -143,7 +143,7 @@ class JackettioProvider {
             mimeType:   best.url.endsWith('.m3u8') ? 'hls' : 'mp4',
             name:       best.name || best.description || 'Direct Stream',
             provider:   'jackettio',
-            allStreams:  direct.map(s => ({ url: s.url, name: s.name || s.description || '' }))
+            allStreams:  direct.map(s => ({ url: s.url, name: s.name || '', description: s.description || '' }))
         };
         setCached(content, result);
         return result;

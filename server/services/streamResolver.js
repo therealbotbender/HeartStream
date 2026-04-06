@@ -22,15 +22,24 @@ const TMDBService = require('../api/tmdb');
 const jackettio = new JackettioProvider();
 const tmdb      = new TMDBService();
 
-// Returns true if at least one significant word (>3 chars) from the expected
-// title appears in the stream name — catches clearly mislabeled torrents.
-function titleMatchesStream(title, streamName) {
-    if (!title || !streamName) return true;
+// Generic Jackettio display labels like "[RD] Jackettio 1080p" carry no
+// torrent-specific info — the IMDB ID search already found the right content,
+// so we trust it and skip title validation for these.
+function isGenericLabel(s) {
+    return !s || /^\[RD\]/i.test(s.trim()) || /^jackettio/i.test(s.trim());
+}
+
+// Returns true if the stream is likely the correct content.
+// - Generic labels: always pass (trust Jackettio's IMDB lookup)
+// - Specific torrent names: at least one title word must appear (catches mislabeling)
+function titleMatchesStream(title, name, description = '') {
+    if (!title) return true;
+    if (isGenericLabel(name) && isGenericLabel(description)) return true; // no torrent name to check
+    const haystack = (name + ' ' + description).toLowerCase();
     const words = s => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 3);
     const titleWords = words(title);
     if (!titleWords.length) return true;
-    const streamWordSet = new Set(words(streamName));
-    return titleWords.some(w => streamWordSet.has(w));
+    return titleWords.some(w => haystack.includes(w));
 }
 
 // Follow Jackettio's redirect chain to get the actual RD CDN URL.
@@ -97,7 +106,7 @@ async function resolve(content) {
             const name = candidate.name || '';
 
             // 1. Title validation — skip mislabeled torrents
-            if (!titleMatchesStream(expectedTitle, name)) {
+            if (!titleMatchesStream(expectedTitle, name, candidate.description)) {
                 console.warn(`[StreamResolver] skipping mislabeled: "${name}" (expected "${expectedTitle}")`);
                 continue;
             }
