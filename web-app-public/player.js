@@ -111,7 +111,11 @@ async function loadDirect(result) {
     videoEl.style.display  = 'block';
 
     if (result.mimeType === 'hls' && window.Hls?.isSupported()) {
-        currentHls = new Hls();
+        currentHls = new Hls({
+            fragLoadingTimeOut:    120000,  // HEVC transcode can take ~50s per segment
+            fragLoadingMaxRetry:   6,
+            fragLoadingRetryDelay: 2000,
+        });
         currentHls.loadSource(result.url);
         currentHls.attachMedia(videoEl);
         currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
