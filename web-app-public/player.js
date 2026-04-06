@@ -4,38 +4,37 @@
  * Flow:
  *  1. play(contentId, type, tmdbId, season?, episode?) called from app.js
  *  2. Calls /api/stream/* — Jackettio via Real-Debrid
- *  3a. Direct URL returned → load into <video> with custom controls
- *  3b. No direct URL     → load VidSrc iframe as fallback
+ *  3. Direct URL → <video> with HLS.js or native, custom controls
  *  4. Progress saved every 10s, on pause, and on close
+ *  5. Skip intro button shown when within detected intro window
+ *  6. Play next episode on video end with 15s countdown + season boundary check
  */
 
 import { API } from './api-client.js';
 import { state } from './state.js';
 
 // DOM refs — resolved once in initPlayer()
-let videoEl, iframeEl, modal, closeBtn, closeBtnIframe, dubToggle,
+let videoEl, modal, closeBtn, dubToggle,
     subBtn, dubBtnEl, qualityPicker, unmuteBtn, customControls;
 let progressSaveTimer = null;
 let lastSavedTime     = 0;
 let currentHls        = null;
 let countdownTimer    = null;
 let hideControlsTimer = null;
+let introTimes        = null; // { intro_start, intro_end } seconds
 
 export function initPlayer() {
-    videoEl          = document.getElementById('video-player');
-    iframeEl         = document.getElementById('video-iframe');
-    modal            = document.getElementById('video-player-modal');
-    closeBtn         = document.getElementById('close-player');
-    closeBtnIframe   = document.getElementById('close-player-iframe');
-    dubToggle        = document.getElementById('dub-toggle');
-    subBtn           = document.getElementById('sub-btn');
-    dubBtnEl         = document.getElementById('dub-btn-el');
-    qualityPicker    = document.getElementById('quality-picker');
-    unmuteBtn        = document.getElementById('unmute-btn');
-    customControls   = document.getElementById('custom-controls');
+    videoEl        = document.getElementById('video-player');
+    modal          = document.getElementById('video-player-modal');
+    closeBtn       = document.getElementById('close-player');
+    dubToggle      = document.getElementById('dub-toggle');
+    subBtn         = document.getElementById('sub-btn');
+    dubBtnEl       = document.getElementById('dub-btn-el');
+    qualityPicker  = document.getElementById('quality-picker');
+    unmuteBtn      = document.getElementById('unmute-btn');
+    customControls = document.getElementById('custom-controls');
 
     closeBtn.addEventListener('click', closePlayer);
-    closeBtnIframe?.addEventListener('click', closePlayer);
     modal.addEventListener('click', e => { if (e.target === modal) closePlayer(); });
 
     unmuteBtn?.addEventListener('click', () => {
@@ -55,6 +54,10 @@ export function initPlayer() {
     document.getElementById('cancel-next-btn')?.addEventListener('click', cancelNextEpisode);
     document.getElementById('cancel-auto-play')?.addEventListener('click', cancelNextEpisode);
 
+    document.getElementById('skip-intro-btn')?.addEventListener('click', skipIntro);
+    document.getElementById('submit-intro-btn')?.addEventListener('click', openSubmitIntroModal);
+
+    wireSubmitIntroModal();
     initCustomControls();
 }
 
@@ -85,7 +88,6 @@ function initCustomControls() {
 
     fsBtn?.addEventListener('click', toggleFullscreen);
 
-    // Seek bar — click or drag
     seekBar?.addEventListener('mousedown', e => {
         seekToEvent(e);
         const onMove = ev => seekToEvent(ev);
@@ -94,18 +96,15 @@ function initCustomControls() {
         document.addEventListener('mouseup', onUp);
     });
 
-    // Sync controls to video state
-    videoEl.addEventListener('timeupdate',     updateSeekBar);
-    videoEl.addEventListener('play',           () => { if (playBtn) playBtn.textContent = '⏸'; });
-    videoEl.addEventListener('pause',          () => { if (playBtn) playBtn.textContent = '▶'; });
-    videoEl.addEventListener('volumechange',   updateMuteIcon);
+    videoEl.addEventListener('timeupdate',   () => { updateSeekBar(); checkSkipIntro(); });
+    videoEl.addEventListener('play',         () => { if (playBtn) playBtn.textContent = '⏸'; });
+    videoEl.addEventListener('pause',        () => { if (playBtn) playBtn.textContent = '▶'; });
+    videoEl.addEventListener('volumechange', updateMuteIcon);
 
-    // Auto-hide controls after 3s of no mouse movement
     const container = document.querySelector('.video-player-container');
     container?.addEventListener('mousemove', showControls);
     container?.addEventListener('mouseleave', () => scheduleHideControls(1000));
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', onKeyDown);
 }
 
@@ -123,9 +122,9 @@ function updateSeekBar() {
     const time   = document.getElementById('ctrl-time');
     if (!videoEl.duration) return;
     const pct = videoEl.currentTime / videoEl.duration;
-    if (fill)   fill.style.width      = `${pct * 100}%`;
-    if (handle) handle.style.left     = `${pct * 100}%`;
-    if (time)   time.textContent      = `${fmtTime(videoEl.currentTime)} / ${fmtTime(videoEl.duration)}`;
+    if (fill)   fill.style.width  = `${pct * 100}%`;
+    if (handle) handle.style.left = `${pct * 100}%`;
+    if (time)   time.textContent  = `${fmtTime(videoEl.currentTime)} / ${fmtTime(videoEl.duration)}`;
 }
 
 function updateMuteIcon() {
@@ -138,11 +137,8 @@ function updateMuteIcon() {
 
 function toggleFullscreen() {
     const container = document.querySelector('.video-player-container');
-    if (!document.fullscreenElement) {
-        container?.requestFullscreen().catch(() => {});
-    } else {
-        document.exitFullscreen().catch(() => {});
-    }
+    if (!document.fullscreenElement) container?.requestFullscreen().catch(() => {});
+    else document.exitFullscreen().catch(() => {});
 }
 
 function showControls() {
@@ -160,8 +156,6 @@ function scheduleHideControls(delay) {
 
 function onKeyDown(e) {
     if (!modal.classList.contains('active')) return;
-    if (state.player.usingFallback) return;
-    // Ignore when typing in inputs
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
     switch (e.key) {
         case ' ': case 'k':
@@ -178,8 +172,8 @@ function onKeyDown(e) {
 }
 
 function fmtTime(s) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
+    const h   = Math.floor(s / 3600);
+    const m   = Math.floor((s % 3600) / 60);
     const sec = Math.floor(s % 60);
     return h > 0
         ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
@@ -202,7 +196,8 @@ function tryPlay() {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 export async function play(contentId, type, tmdbId, season = null, episode = null) {
-    state.player = { contentId, type, tmdbId, season, episode, usingFallback: false, allStreams: [] };
+    state.player = { contentId, type, tmdbId, season, episode, allStreams: [] };
+    introTimes   = null;
 
     openModal();
     showLoading();
@@ -214,8 +209,6 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
 
         if (result.success && result.url) {
             await loadDirect(result);
-        } else if (result.fallback && result.sources?.length) {
-            loadIframe(result.sources[0].url);
         } else {
             showError('No stream found for this title.');
         }
@@ -228,38 +221,23 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
 // ── Codec / container capability detection ────────────────────────────────────
 
 function canPlayNativeMkv() {
-    // Only Chromium-based browsers reliably decode MKV with arbitrary codecs (H.264, HEVC, etc.)
-    // Firefox media.mkv.enabled=true allows the container but video decoding is still limited
     return /Chrome\//.test(navigator.userAgent);
 }
 
 // ── Direct stream ─────────────────────────────────────────────────────────────
 
-function fallbackToIframe() {
-    const { type, tmdbId, season, episode } = state.player;
-    const url = type === 'movie'
-        ? `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`
-        : `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
-    loadIframe(url);
-}
-
 async function loadDirect(result) {
-    state.player.usingFallback = false;
-    state.player.allStreams    = result.allStreams || [];
+    state.player.allStreams = result.allStreams || [];
 
     if (result.nativeUrl && canPlayNativeMkv()) {
-        console.log('[player] native MKV supported — skipping transcode');
         result = { ...result, url: result.nativeUrl, mimeType: 'mp4' };
     }
 
     const saved = await getSavedProgress();
 
     destroyHls();
-    iframeEl.style.display          = 'none';
-    iframeEl.src                    = '';
-    if (closeBtnIframe) closeBtnIframe.style.display = 'none';
-    videoEl.style.display           = 'block';
-    customControls.style.display    = 'flex';
+    videoEl.style.display        = 'block';
+    customControls.style.display = 'flex';
 
     if (result.mimeType === 'hls' && window.Hls?.isSupported()) {
         currentHls = new Hls({
@@ -276,18 +254,12 @@ async function loadDirect(result) {
     } else {
         videoEl.src = result.url;
         videoEl.load();
-
-        let startupTimer = setTimeout(() => fallbackToIframe(), 25000);
-
         videoEl.addEventListener('loadedmetadata', () => {
-            clearTimeout(startupTimer);
             if (saved > 0) videoEl.currentTime = saved;
             tryPlay();
         }, { once: true });
-
         videoEl.addEventListener('error', () => {
-            clearTimeout(startupTimer);
-            fallbackToIframe();
+            showError('Stream failed to load. The file may be unsupported.');
         }, { once: true });
     }
 
@@ -296,22 +268,11 @@ async function loadDirect(result) {
     updateDubToggle(state.player.allStreams);
     startProgressTimer();
     showControls();
-}
 
-// ── Iframe fallback ───────────────────────────────────────────────────────────
-
-function loadIframe(url) {
-    state.player.usingFallback    = true;
-    destroyHls();
-    videoEl.style.display         = 'none';
-    videoEl.src                   = '';
-    customControls.style.display  = 'none';
-    if (closeBtnIframe) { closeBtnIframe.style.display = 'block'; }
-    iframeEl.style.display        = 'block';
-    iframeEl.src                  = url;
-    hideLoading();
-    if (qualityPicker) qualityPicker.style.display = 'none';
-    if (dubToggle)     dubToggle.style.display     = 'none';
+    // Fetch intro times in background (TV only)
+    if (state.player.type === 'tv' && state.player.season != null) {
+        fetchIntroTimes();
+    }
 }
 
 // ── Quality picker ────────────────────────────────────────────────────────────
@@ -369,6 +330,115 @@ export function setDubPref(wantDub) {
     }, { once: true });
 }
 
+// ── Skip intro ────────────────────────────────────────────────────────────────
+
+async function fetchIntroTimes() {
+    try {
+        const data = await API.intro.get(
+            state.player.contentId,
+            state.player.season,
+            state.player.episode
+        );
+        introTimes = data; // null if none found
+    } catch {
+        introTimes = null;
+    }
+}
+
+function checkSkipIntro() {
+    const btn = document.getElementById('skip-intro-btn');
+    if (!btn) return;
+    if (!introTimes) { btn.style.display = 'none'; return; }
+    const t = videoEl.currentTime;
+    const inIntro = t >= introTimes.intro_start && t < introTimes.intro_end;
+    btn.style.display = inIntro ? 'block' : 'none';
+}
+
+function skipIntro() {
+    if (introTimes) videoEl.currentTime = introTimes.intro_end;
+}
+
+// ── Submit intro modal ────────────────────────────────────────────────────────
+
+function openSubmitIntroModal() {
+    const m = document.getElementById('submit-intro-modal');
+    if (!m) return;
+    updateCurrentVideoTime();
+    document.getElementById('intro-start-input').value = '';
+    document.getElementById('intro-end-input').value   = '';
+    document.getElementById('intro-preview').style.display = 'none';
+    m.classList.add('active');
+}
+
+function updateCurrentVideoTime() {
+    const el = document.getElementById('current-video-time');
+    if (el) el.textContent = fmtTime(videoEl.currentTime);
+}
+
+function wireSubmitIntroModal() {
+    const m = document.getElementById('submit-intro-modal');
+    if (!m) return;
+
+    // Keep current time display updated while modal is open
+    videoEl.addEventListener('timeupdate', () => {
+        if (m.classList.contains('active')) updateCurrentVideoTime();
+    });
+
+    document.getElementById('set-intro-start-btn')?.addEventListener('click', () => {
+        document.getElementById('intro-start-input').value = Math.floor(videoEl.currentTime);
+        updateIntroPreview();
+    });
+
+    document.getElementById('set-intro-end-btn')?.addEventListener('click', () => {
+        document.getElementById('intro-end-input').value = Math.floor(videoEl.currentTime);
+        updateIntroPreview();
+    });
+
+    ['intro-start-input', 'intro-end-input'].forEach(id =>
+        document.getElementById(id)?.addEventListener('input', updateIntroPreview)
+    );
+
+    document.getElementById('cancel-intro-submission')?.addEventListener('click', () => {
+        m.classList.remove('active');
+    });
+
+    document.getElementById('intro-submission-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        const introStart = parseInt(document.getElementById('intro-start-input').value);
+        const introEnd   = parseInt(document.getElementById('intro-end-input').value);
+        if (isNaN(introStart) || isNaN(introEnd) || introEnd <= introStart) return;
+
+        try {
+            await API.intro.submit({
+                userId:        state.currentUser?.id || null,
+                contentId:     state.player.contentId,
+                seasonNumber:  state.player.season,
+                episodeNumber: state.player.episode,
+                introStart, introEnd
+            });
+            introTimes = { intro_start: introStart, intro_end: introEnd };
+            m.classList.remove('active');
+        } catch (err) {
+            console.error('[player] intro submit failed', err);
+        }
+    });
+}
+
+function updateIntroPreview() {
+    const start = parseInt(document.getElementById('intro-start-input').value);
+    const end   = parseInt(document.getElementById('intro-end-input').value);
+    const preview = document.getElementById('intro-preview');
+    if (!preview) return;
+    if (!isNaN(start) && !isNaN(end) && end > start) {
+        document.getElementById('preview-start').textContent    = start;
+        document.getElementById('preview-end').textContent      = end;
+        document.getElementById('preview-duration').textContent = end - start;
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
 // ── Progress tracking ─────────────────────────────────────────────────────────
 
 function startProgressTimer() {
@@ -377,9 +447,8 @@ function startProgressTimer() {
 }
 
 async function saveProgress() {
-    if (state.player.usingFallback) return;
-    if (!state.currentUser)         return;
-    if (!videoEl.duration)          return;
+    if (!state.currentUser)  return;
+    if (!videoEl.duration)   return;
 
     const progressTime = Math.floor(videoEl.currentTime);
     const totalTime    = Math.floor(videoEl.duration);
@@ -415,6 +484,8 @@ async function getSavedProgress() {
     }
 }
 
+// ── Play next episode ─────────────────────────────────────────────────────────
+
 function onEnded() {
     saveProgress();
     clearInterval(progressSaveTimer);
@@ -423,16 +494,39 @@ function onEnded() {
     }
 }
 
-function scheduleNextEpisode() {
+function getNextEpisode() {
     const { season, episode } = state.player;
-    const nextEp = episode + 1;
+    const seasons = state.selectedContent?.seasons || [];
+
+    const currentSeasonInfo = seasons.find(s => s.seasonNumber === season);
+    const hasNextInSeason   = currentSeasonInfo
+        ? episode < currentSeasonInfo.episodeCount
+        : true; // unknown — optimistically try
+
+    if (hasNextInSeason) {
+        return { season, episode: episode + 1 };
+    }
+
+    // Try next season
+    const nextSeasonInfo = seasons.find(s => s.seasonNumber === season + 1);
+    if (nextSeasonInfo) {
+        return { season: season + 1, episode: 1 };
+    }
+
+    return null; // Series complete
+}
+
+function scheduleNextEpisode() {
+    const next = getNextEpisode();
+    if (!next) return; // Last episode — nothing to queue
 
     const panel      = document.getElementById('next-episode-panel');
     const countdownEl = document.getElementById('auto-play-countdown');
     const timerSpan  = document.getElementById('countdown-timer');
 
     if (panel) {
-        document.getElementById('next-episode-title').textContent = `Season ${season}, Episode ${nextEp}`;
+        document.getElementById('next-episode-title').textContent =
+            `Season ${next.season}, Episode ${next.episode}`;
         panel.style.display = 'flex';
     }
     if (countdownEl) countdownEl.style.display = 'flex';
@@ -451,10 +545,12 @@ function scheduleNextEpisode() {
 }
 
 function playNextEpisode() {
+    const next = getNextEpisode();
+    if (!next) return;
     clearInterval(countdownTimer);
     hideNextEpisodeUI();
-    const { contentId, type, tmdbId, season, episode } = state.player;
-    play(contentId, type, tmdbId, season, episode + 1);
+    const { contentId, type, tmdbId } = state.player;
+    play(contentId, type, tmdbId, next.season, next.episode);
 }
 
 function cancelNextEpisode() {
@@ -482,34 +578,29 @@ export function closePlayer() {
     clearInterval(countdownTimer);
     clearTimeout(hideControlsTimer);
     hideNextEpisodeUI();
+    document.getElementById('skip-intro-btn').style.display   = 'none';
+    document.getElementById('submit-intro-modal')?.classList.remove('active');
     lastSavedTime = 0;
+    introTimes    = null;
     videoEl.pause();
     destroyHls();
-    videoEl.muted         = false;
-    videoEl.src           = '';
-    iframeEl.src          = '';
-    if (unmuteBtn)       unmuteBtn.style.display       = 'none';
-    if (closeBtnIframe)  closeBtnIframe.style.display  = 'none';
-    videoEl.style.display         = 'none';
-    iframeEl.style.display        = 'none';
-    customControls.style.display  = 'none';
+    videoEl.muted  = false;
+    videoEl.src    = '';
+    if (unmuteBtn) unmuteBtn.style.display = 'none';
+    videoEl.style.display        = 'none';
+    customControls.style.display = 'none';
     customControls.classList.remove('controls-hidden');
 
     modal.classList.remove('active');
     document.body.style.overflow = '';
 
-    state.player = {
-        contentId: null, type: null, tmdbId: null,
-        season: null, episode: null, usingFallback: false, allStreams: []
-    };
-
+    state.player = { contentId: null, type: null, tmdbId: null, season: null, episode: null, allStreams: [] };
     document.dispatchEvent(new CustomEvent('player:closed'));
 }
 
 function showLoading() {
-    videoEl.style.display         = 'none';
-    iframeEl.style.display        = 'none';
-    customControls.style.display  = 'none';
+    videoEl.style.display        = 'none';
+    customControls.style.display = 'none';
     const overlay = document.getElementById('stream-reconnect-overlay');
     overlay.innerHTML = `<div class="reconnect-content"><div class="reconnect-spinner"></div><p>Finding stream...</p></div>`;
     overlay.style.display = 'flex';
@@ -520,6 +611,8 @@ function hideLoading() {
 }
 
 function showError(msg) {
+    videoEl.style.display        = 'none';
+    customControls.style.display = 'none';
     const overlay = document.getElementById('stream-reconnect-overlay');
     overlay.innerHTML = `<div class="reconnect-content"><p style="color:#ef4444">${msg}</p><button onclick="document.getElementById('close-player').click()" style="margin-top:1rem;padding:0.5rem 1rem;background:#374151;border:none;border-radius:6px;color:#fff;cursor:pointer">Close</button></div>`;
     overlay.style.display = 'flex';

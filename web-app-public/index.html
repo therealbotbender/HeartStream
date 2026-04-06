@@ -186,7 +186,6 @@
             <div class="modal-content">
                 <div class="video-player-container">
                     <video id="video-player" preload="none" playsinline style="display: none;"></video>
-                    <iframe id="video-iframe" width="100%" height="100%" frameborder="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin" style="display: none;"></iframe>
 
                     <!-- Unified custom controls — shown for native video, hidden for iframe -->
                     <div id="custom-controls" class="custom-controls">
@@ -216,8 +215,6 @@
                         </div>
                     </div>
 
-                    <!-- Top-right close for iframe (no custom controls) -->
-                    <button id="close-player-iframe" class="close-btn close-btn-iframe" style="display:none;">&times;</button>
                     <div id="stream-reconnect-overlay" class="stream-reconnect-overlay" style="display: none;">
                         <div class="reconnect-content">
                             <div class="reconnect-spinner"></div>

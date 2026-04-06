@@ -608,6 +608,10 @@ async function openContentDetail(contentId, type) {
             play(contentId, 'tv', tmdbId, s, e);
         }
     };
+
+    document.getElementById('detail-add-playlist-btn').onclick = () => {
+        openAddToPlaylistModal(contentId, type);
+    };
 }
 
 async function updatePlayButtonLabel(contentId, type, lastWatched) {
@@ -663,6 +667,99 @@ async function loadEpisodeGrid(contentId, tmdbId, season) {
             play(contentId, 'tv', tmdbId, s, ep);
         });
     });
+}
+
+// ── Playlists ─────────────────────────────────────────────────────────────────
+
+let _pendingPlaylistContent = null; // { contentId, type } waiting to be added
+
+async function openAddToPlaylistModal(contentId, type) {
+    if (!state.currentUser) return;
+    _pendingPlaylistContent = { contentId, type };
+
+    const modal = document.getElementById('add-to-playlist-modal');
+    const sel   = document.getElementById('playlist-selection');
+    sel.innerHTML = '<p class="loading-msg">Loading...</p>';
+    modal.classList.add('active');
+
+    const playlists = await API.playlists.list(state.currentUser.id).catch(() => []);
+    if (!playlists.length) {
+        sel.innerHTML = '<p class="empty-msg">No playlists yet. Create one below.</p>';
+    } else {
+        sel.innerHTML = playlists.map(p => `
+            <label class="playlist-select-item">
+                <input type="radio" name="playlist-pick" value="${p.id}">
+                <span>${escapeHtml(p.name)}</span>
+                <small>${p.item_count || 0} items</small>
+            </label>
+        `).join('');
+    }
+}
+
+function wirePlaylistModals() {
+    // Add-to-playlist modal
+    document.getElementById('cancel-add-to-playlist')?.addEventListener('click', () => {
+        document.getElementById('add-to-playlist-modal').classList.remove('active');
+        _pendingPlaylistContent = null;
+    });
+
+    document.getElementById('confirm-add-to-playlist')?.addEventListener('click', async () => {
+        const picked = document.querySelector('input[name="playlist-pick"]:checked');
+        if (!picked || !_pendingPlaylistContent) return;
+        const { contentId, type } = _pendingPlaylistContent;
+        try {
+            await API.playlists.addItem(parseInt(picked.value), contentId, type);
+            document.getElementById('add-to-playlist-modal').classList.remove('active');
+            _pendingPlaylistContent = null;
+        } catch (err) {
+            console.error('[playlists] add failed', err);
+        }
+    });
+
+    // Create playlist from add-modal shortcut
+    document.getElementById('create-new-playlist-btn')?.addEventListener('click', () => {
+        document.getElementById('add-to-playlist-modal').classList.remove('active');
+        openCreatePlaylistModal();
+    });
+
+    // Create/edit playlist modal
+    document.getElementById('cancel-playlist')?.addEventListener('click', () => {
+        document.getElementById('playlist-modal').classList.remove('active');
+    });
+
+    document.getElementById('playlist-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!state.currentUser) return;
+        const name = document.getElementById('playlist-name-input').value.trim();
+        const desc = document.getElementById('playlist-description-input').value.trim();
+        if (!name) return;
+        try {
+            await API.playlists.create(state.currentUser.id, name, desc || null);
+            document.getElementById('playlist-modal').classList.remove('active');
+            // Re-open add modal if we came from there
+            if (_pendingPlaylistContent) {
+                openAddToPlaylistModal(_pendingPlaylistContent.contentId, _pendingPlaylistContent.type);
+            }
+        } catch (err) {
+            console.error('[playlists] create failed', err);
+        }
+    });
+
+    // Manage playlists modal
+    document.getElementById('close-manage-playlists')?.addEventListener('click', () => {
+        document.getElementById('manage-playlists-modal').classList.remove('active');
+    });
+
+    document.getElementById('create-new-playlist-manage-btn')?.addEventListener('click', openCreatePlaylistModal);
+}
+
+function openCreatePlaylistModal() {
+    const m = document.getElementById('playlist-modal');
+    document.getElementById('playlist-modal-title').textContent = 'Create Playlist';
+    document.getElementById('playlist-name-input').value        = '';
+    document.getElementById('playlist-description-input').value = '';
+    document.getElementById('save-playlist').textContent        = 'Create Playlist';
+    m.classList.add('active');
 }
 
 // ── User management ───────────────────────────────────────────────────────────
@@ -853,6 +950,7 @@ function wireGlobalEvents() {
     });
 
     wireUserModals();
+    wirePlaylistModals();
 }
 
 // ── Screen switching ──────────────────────────────────────────────────────────

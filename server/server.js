@@ -41,7 +41,7 @@ app.get('/api/content/movies', async (req, res) => {
         const { page = 1, genre, sort_by = 'popular', keyword, exclude_keyword, language } = req.query;
         res.json(await content.getMovies(
             parseInt(page), genre || null, sort_by,
-            false, keyword || null, exclude_keyword || null, language || null
+            keyword || null, exclude_keyword || null, language || null
         ));
     } catch (err) {
         console.error('/api/content/movies', err.message);
@@ -54,7 +54,7 @@ app.get('/api/content/tv-shows', async (req, res) => {
         const { page = 1, genre, sort_by = 'popular', keyword, exclude_keyword, language } = req.query;
         res.json(await content.getTVShows(
             parseInt(page), genre || null, sort_by,
-            false, keyword || null, exclude_keyword || null, language || null
+            keyword || null, exclude_keyword || null, language || null
         ));
     } catch (err) {
         console.error('/api/content/tv-shows', err.message);
@@ -149,13 +149,7 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
     const stream = await streamResolver.resolve(contentObj);
     if (stream) return res.json(stream);
 
-    // AIOStreams had nothing — return iframe fallback URLs
-    const fallbackSources = content.generateVideoSources(
-        type, tmdbId,
-        season  ? parseInt(season)  : null,
-        episode ? parseInt(episode) : null
-    );
-    return res.json({ success: false, fallback: true, sources: fallbackSources });
+    return res.status(404).json({ success: false, error: 'No stream available for this title.' });
 });
 
 // ── MediaFlow internal proxy ──────────────────────────────────────────────────
@@ -422,6 +416,106 @@ app.get('/api/continue-watching/:userId', async (req, res) => {
         res.json(enriched);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch continue watching' });
+    }
+});
+
+// ── Playlists ─────────────────────────────────────────────────────────────────
+
+app.get('/api/playlists/:userId', async (req, res) => {
+    try { res.json(await db.getUserPlaylists(parseInt(req.params.userId))); }
+    catch (err) { res.status(500).json({ error: 'Failed to fetch playlists' }); }
+});
+
+app.post('/api/playlists', async (req, res) => {
+    const { userId, name, description } = req.body;
+    if (!userId || !name) return res.status(400).json({ error: 'userId and name required' });
+    try {
+        const id = await db.createPlaylist(userId, name, description || null);
+        res.status(201).json({ id, name, description: description || null, item_count: 0 });
+    } catch (err) { res.status(500).json({ error: 'Failed to create playlist' }); }
+});
+
+app.put('/api/playlists/:id', async (req, res) => {
+    const { name, description } = req.body;
+    try {
+        await db.updatePlaylist(parseInt(req.params.id), name, description || null);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed to update playlist' }); }
+});
+
+app.delete('/api/playlists/:id', async (req, res) => {
+    try {
+        await db.deletePlaylist(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed to delete playlist' }); }
+});
+
+app.get('/api/playlists/:id/items', async (req, res) => {
+    try {
+        const items = await db.getPlaylistItems(parseInt(req.params.id));
+        const enriched = await Promise.all(items.map(async item => {
+            try {
+                const details = await content.getContentDetails(item.content_id, item.content_type);
+                return { ...item, title: details?.title || item.content_id, poster: details?.poster || null };
+            } catch { return { ...item, title: item.content_id, poster: null }; }
+        }));
+        res.json(enriched);
+    } catch (err) { res.status(500).json({ error: 'Failed to fetch playlist items' }); }
+});
+
+app.post('/api/playlists/:id/items', async (req, res) => {
+    const { contentId, contentType } = req.body;
+    if (!contentId || !contentType) return res.status(400).json({ error: 'contentId and contentType required' });
+    try {
+        await db.addToPlaylist(parseInt(req.params.id), contentId, contentType);
+        res.status(201).json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed to add to playlist' }); }
+});
+
+app.delete('/api/playlists/:id/items/:contentId', async (req, res) => {
+    try {
+        await db.removeFromPlaylist(parseInt(req.params.id), decodeURIComponent(req.params.contentId));
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed to remove from playlist' }); }
+});
+
+// ── Intro times ───────────────────────────────────────────────────────────────
+
+app.get('/api/intro/:contentId', async (req, res) => {
+    try {
+        const contentId = decodeURIComponent(req.params.contentId);
+        const season    = req.query.season  ? parseInt(req.query.season)  : null;
+        const episode   = req.query.episode ? parseInt(req.query.episode) : null;
+
+        // Check persistent cache first
+        const cached = await db.getCachedIntroData(contentId, season, episode);
+        if (cached) return res.json({ intro_start: cached.intro_start, intro_end: cached.intro_end, source: cached.source });
+
+        // Fall back to best community submission
+        const sub = await db.getUserIntroSubmissions(contentId, season, episode);
+        if (sub) return res.json({ intro_start: sub.intro_start, intro_end: sub.intro_end, source: 'community' });
+
+        res.json(null);
+    } catch (err) {
+        console.error('/api/intro GET', err.message);
+        res.status(500).json({ error: 'Failed to fetch intro data' });
+    }
+});
+
+app.post('/api/intro', async (req, res) => {
+    try {
+        const { userId, contentId, seasonNumber, episodeNumber, introStart, introEnd } = req.body;
+        if (!contentId || introStart == null || introEnd == null)
+            return res.status(400).json({ error: 'contentId, introStart, introEnd required' });
+        if (introEnd <= introStart)
+            return res.status(400).json({ error: 'introEnd must be after introStart' });
+
+        await db.submitIntroTimes(userId || null, contentId, seasonNumber || null, episodeNumber || null, introStart, introEnd);
+        await db.setCachedIntroData(contentId, seasonNumber || null, episodeNumber || null, introStart, introEnd, 'user_submission', 0.7, null, 168);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('/api/intro POST', err.message);
+        res.status(500).json({ error: 'Failed to submit intro times' });
     }
 });
 

@@ -16,13 +16,12 @@ export const state = {
 
     // Active playback
     player: {
-        contentId:     null,    // e.g. 'movie_12345' or 'tv_67890'
-        type:          null,    // 'movie' | 'tv'
-        tmdbId:        null,
-        season:        null,
-        episode:       null,
-        usingFallback: false,   // true = iframe fallback is active
-        allStreams:    [],       // quality options from AIOStreams
+        contentId:  null,   // e.g. 'movie_12345' or 'tv_67890'
+        type:       null,   // 'movie' | 'tv'
+        tmdbId:     null,
+        season:     null,
+        episode:    null,
+        allStreams: [],     // quality/language options from Jackettio
     },
 
     // Genre / category browser

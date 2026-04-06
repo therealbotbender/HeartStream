@@ -120,6 +120,25 @@ export const API = (() => {
         remove: (userId, contentId)       => del(`/api/favorites/${userId}/${encodeURIComponent(contentId)}`)
     };
 
-    return { content, streams, users, progress, favorites };
+    // ── Playlists ─────────────────────────────────────────────────────────────
+
+    const playlists = {
+        list:       (userId)                        => get(`/api/playlists/${userId}`),
+        create:     (userId, name, description)     => post('/api/playlists', { userId, name, description }),
+        update:     (id, name, description)         => put(`/api/playlists/${id}`, { name, description }),
+        delete:     (id)                            => del(`/api/playlists/${id}`),
+        items:      (id)                            => get(`/api/playlists/${id}/items`),
+        addItem:    (id, contentId, contentType)    => post(`/api/playlists/${id}/items`, { contentId, contentType }),
+        removeItem: (id, contentId)                 => del(`/api/playlists/${id}/items/${encodeURIComponent(contentId)}`)
+    };
+
+    // ── Intro times ───────────────────────────────────────────────────────────
+
+    const intro = {
+        get:    (contentId, season, episode) => get(`/api/intro/${encodeURIComponent(contentId)}`, { season, episode }),
+        submit: (data)                       => post('/api/intro', data)
+    };
+
+    return { content, streams, users, progress, favorites, playlists, intro };
 })();
 
