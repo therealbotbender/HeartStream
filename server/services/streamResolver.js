@@ -21,11 +21,17 @@ const tmdb      = new TMDBService();
 // The browser will use this directly — no proxy, no transcode latency.
 async function resolveRedirect(url) {
     try {
+        // Use redirect:manual so we get the Location header on the first hop
+        // without triggering any upstream HEAD requests on the redirect target.
+        // For Jackettio → MediaFlow chains this avoids a ~1s RD preflight.
         const res = await fetch(url, {
             method:   'HEAD',
-            redirect: 'follow',
+            redirect: 'manual',
             signal:   AbortSignal.timeout(10000),
         });
+        if (res.status >= 300 && res.status < 400) {
+            return res.headers.get('location') || url;
+        }
         return res.url || url;
     } catch {
         return url;
