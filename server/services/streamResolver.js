@@ -47,10 +47,27 @@ async function resolve(content) {
         const stream = await jackettio.getStream({ ...content, imdbId });
         if (!stream) return null;
 
-        // MediaFlow URLs are already HLS — no redirect needed
-        if (stream.url.includes('.m3u8') || stream.url.includes('/proxy/hls/') || stream.url.includes('/proxy/stream')) {
-            console.log(`[StreamResolver] MediaFlow HLS stream`);
-            return { ...stream, mimeType: 'hls' };
+        // MediaFlow URL — check if it needs upgrading to HLS transcoding
+        if (stream.url.includes('/proxy/stream') || stream.url.includes('/proxy/hls/')) {
+            let finalUrl = stream.url;
+            let mimeType = 'hls';
+
+            if (stream.url.includes('/proxy/stream')) {
+                // Inspect the target file — if not natively playable, switch to HLS endpoint
+                const targetParam = new URL(stream.url).searchParams.get('d') || '';
+                const ext = targetParam.toLowerCase().split('?')[0].split('.').pop();
+                const native = ['mp4', 'webm', 'mov'].includes(ext);
+
+                if (native) {
+                    mimeType = 'mp4';
+                } else {
+                    // Rewrite /proxy/stream → /proxy/hls/manifest.m3u8 (MediaFlow transcodes to HLS)
+                    finalUrl = stream.url.replace('/proxy/stream', '/proxy/hls/manifest.m3u8');
+                    console.log(`[StreamResolver] MediaFlow: upgrading ${ext} → HLS`);
+                }
+            }
+
+            return { ...stream, url: finalUrl, mimeType };
         }
 
         // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
