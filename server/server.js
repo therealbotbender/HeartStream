@@ -209,7 +209,9 @@ app.use('/api/mf', (req, res) => {
             });
             upstream.on('end', () => {
                 const body = Buffer.concat(chunks).toString('utf8');
-                res.send(body.replaceAll(MEDIAFLOW_INTERNAL, '/api/mf'));
+                // Replace any absolute MediaFlow URL regardless of hostname/IP —
+                // MediaFlow may use its own IP in segment URLs, not the Docker hostname.
+                res.send(body.replace(/https?:\/\/[^/"'\s]+\/proxy\//g, '/api/mf/proxy/'));
             });
         } else {
             upstream.pipe(res);
