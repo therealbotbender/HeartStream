@@ -966,7 +966,7 @@ body {
     display: flex;
     gap: 1.5rem;
     align-items: flex-start;
-    padding: 2rem 2rem 1.25rem;
+    padding: 2rem 3.5rem 1.25rem 2rem; /* right padding clears the ✕ button */
 }
 
 .detail-hero-poster {
@@ -1225,6 +1225,17 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 500;
+}
+
+.detail-episodes-grid .ep-overview {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.45;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .detail-episodes-grid .ep-bar {

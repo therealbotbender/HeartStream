@@ -139,6 +139,7 @@ export function buildGenreRowShell(title, genreId, type) {
 export function buildEpisodeCard(ep, watchedProgress) {
     const pct = watchedProgress ? Math.round(watchedProgress * 100) : 0;
     const watched = pct >= 90 ? ' ep-watched' : '';
+    const overview = ep.overview ? `<p class="ep-overview">${escapeHtml(ep.overview)}</p>` : '';
 
     return `
         <div class="episode-card${watched}"
@@ -148,6 +149,7 @@ export function buildEpisodeCard(ep, watchedProgress) {
                 <span class="ep-label">E${ep.episodeNumber}</span>
                 <span class="ep-title">${escapeHtml(ep.title || 'Episode ' + ep.episodeNumber)}</span>
             </div>
+            ${overview}
             <div class="ep-bar"><div class="ep-bar-fill" style="width:${pct}%"></div></div>
         </div>
     `.trim();
