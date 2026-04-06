@@ -21,6 +21,12 @@ const MEDIAFLOW_PASSWORD = process.env.MEDIAFLOW_API_PASSWORD || 'heartstream';
 const INDEXERS  = (process.env.JACKETTIO_INDEXERS  || 'thepiratebay,yts,eztv,therarbg').split(',');
 const QUALITIES = (process.env.JACKETTIO_QUALITIES || '720,1080,2160').split(',').map(Number);
 
+// Comma-separated name/hash fragments to permanently exclude from results.
+// Useful when an indexer has a torrent mislabeled under the wrong IMDB ID.
+// e.g. JACKETTIO_BLACKLIST=Star.Wars.Maul.Shadow.Lord,b6318f2df1c3310f31ce519a7feed1dd26ebbde6
+const BLACKLIST = (process.env.JACKETTIO_BLACKLIST || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
 // Quality preference for ranking (lower index = preferred)
 const QUALITY_RANK = [2160, 1080, 720, 480, 360];
 
@@ -115,7 +121,14 @@ class JackettioProvider {
 
         const direct = streams
             .filter(s => s.url?.startsWith('http'))
-            .map(s => ({ ...s, url: fixUrl(s.url) }));
+            .map(s => ({ ...s, url: fixUrl(s.url) }))
+            .filter(s => {
+                if (!BLACKLIST.length) return true;
+                const haystack = ((s.name || '') + ' ' + (s.url || '')).toLowerCase();
+                const blocked = BLACKLIST.find(b => haystack.includes(b));
+                if (blocked) console.log(`[Jackettio] blacklisted stream: ${s.name} (matched "${blocked}")`);
+                return !blocked;
+            });
 
         if (!direct.length) return null;
 
