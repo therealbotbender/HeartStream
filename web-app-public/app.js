@@ -556,6 +556,16 @@ async function openContentDetail(contentId, type) {
         episodesSection.style.display = 'none';
     }
 
+    // Prefetch stream in background — warms the server cache so Play is instant
+    if (type === 'movie') {
+        API.streams.movie(tmdbId).catch(() => {});
+    } else if (data.seasons?.length) {
+        const lastWatched = state.continueWatching?.find(c => c.content_id === contentId);
+        const s = lastWatched?.season_number  || 1;
+        const e = lastWatched?.episode_number || 1;
+        API.streams.tv(tmdbId, s, e).catch(() => {});
+    }
+
     // Play button label
     updatePlayButtonLabel(contentId, type);
 
