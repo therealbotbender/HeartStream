@@ -18,9 +18,15 @@ export function buildCard(item) {
             ? `${TMDB_IMG}${item.posterPath}`
             : '/icons/placeholder.png';
 
-    const progress = getCardProgress(item.id);
+    const watchEntry = getWatchEntry(item.id);
+    const progress   = watchEntry && watchEntry.total_time ? watchEntry.progress_time / watchEntry.total_time : 0;
+
+    const epLabel = item.type === 'tv' && watchEntry?.season_number
+        ? `<span class="card-ep-label">S${watchEntry.season_number} E${watchEntry.episode_number}</span>`
+        : '';
+
     const progressBar = progress > 0
-        ? `<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.round(progress * 100)}%"></div></div>`
+        ? `<div class="card-progress-wrap">${epLabel}<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.round(progress * 100)}%"></div></div></div>`
         : '';
 
     const year = item.year || item.releaseDate?.slice(0, 4) || item.firstAirDate?.slice(0, 4) || '';
@@ -43,11 +49,9 @@ export function buildCard(item) {
     `.trim();
 }
 
-function getCardProgress(contentId) {
-    if (!state.currentUser) return 0;
-    const entry = state.continueWatching.find(c => c.content_id === contentId);
-    if (!entry || !entry.total_time) return 0;
-    return entry.progress_time / entry.total_time;
+function getWatchEntry(contentId) {
+    if (!state.currentUser) return null;
+    return state.continueWatching.find(c => c.content_id === contentId) || null;
 }
 
 // ── Carousel ──────────────────────────────────────────────────────────────────
