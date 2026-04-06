@@ -18,7 +18,6 @@ let videoEl, modal, closeBtn, dubToggle,
     subBtn, dubBtnEl, qualityPicker, unmuteBtn, customControls;
 let progressSaveTimer = null;
 let lastSavedTime     = 0;
-let currentHls        = null;
 let countdownTimer    = null;
 let hideControlsTimer = null;
 let introTimes        = null; // { intro_start, intro_end } seconds
@@ -242,50 +241,25 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
     }
 }
 
-// ── Codec / container capability detection ────────────────────────────────────
-
-function canPlayNativeMkv() {
-    return /Chrome\//.test(navigator.userAgent);
-}
-
 // ── Direct stream ─────────────────────────────────────────────────────────────
 
 async function loadDirect(result) {
     state.player.allStreams = result.allStreams || [];
 
-    if (result.nativeUrl && canPlayNativeMkv()) {
-        result = { ...result, url: result.nativeUrl, mimeType: 'mp4' };
-    }
-
     const saved = await getSavedProgress();
 
-    destroyHls();
     videoEl.style.display        = 'block';
     customControls.style.display = 'flex';
 
-    if (result.mimeType === 'hls' && window.Hls?.isSupported()) {
-        currentHls = new Hls({
-            fragLoadingTimeOut:    120000,
-            fragLoadingMaxRetry:   6,
-            fragLoadingRetryDelay: 2000,
-        });
-        currentHls.loadSource(result.url);
-        currentHls.attachMedia(videoEl);
-        currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (saved > 0) videoEl.currentTime = saved;
-            tryPlay();
-        });
-    } else {
-        videoEl.src = result.url;
-        videoEl.load();
-        videoEl.addEventListener('loadedmetadata', () => {
-            if (saved > 0) videoEl.currentTime = saved;
-            tryPlay();
-        }, { once: true });
-        videoEl.addEventListener('error', () => {
-            showError('Stream failed to load. The file may be unsupported.');
-        }, { once: true });
-    }
+    videoEl.src = result.url;
+    videoEl.load();
+    videoEl.addEventListener('loadedmetadata', () => {
+        if (saved > 0) videoEl.currentTime = saved;
+        tryPlay();
+    }, { once: true });
+    videoEl.addEventListener('error', () => {
+        showError('Stream failed to load. The file may be unsupported.');
+    }, { once: true });
 
     hideLoading();
     updateQualityPicker(state.player.allStreams);
@@ -321,7 +295,6 @@ function switchStream(index) {
     const stream = state.player.allStreams[parseInt(index)];
     if (!stream?.url) return;
     const current = videoEl.currentTime;
-    destroyHls();
     videoEl.src = stream.url;
     videoEl.load();
     videoEl.addEventListener('loadedmetadata', () => {
@@ -349,7 +322,6 @@ export function setDubPref(wantDub) {
     dubBtnEl?.classList.toggle('active', wantDub);
 
     const current = videoEl.currentTime;
-    destroyHls();
     videoEl.src = match.url;
     videoEl.load();
     videoEl.addEventListener('loadedmetadata', () => {
@@ -658,7 +630,6 @@ export function closePlayer() {
     introTimes    = null;
     endingTimes   = null;
     videoEl.pause();
-    destroyHls();
     videoEl.muted  = false;
     videoEl.src    = '';
     if (unmuteBtn) unmuteBtn.style.display = 'none';
@@ -693,9 +664,3 @@ function showError(msg) {
     overlay.style.display = 'flex';
 }
 
-function destroyHls() {
-    if (currentHls) {
-        currentHls.destroy();
-        currentHls = null;
-    }
-}

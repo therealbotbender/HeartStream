@@ -5,14 +5,10 @@
  *
  * Flow:
  *  1. Convert TMDB ID → IMDb ID (cached in TMDBService)
- *  2. Call Jackettio → Real-Debrid → direct HTTPS URL
- *  3. Return StreamResult or null (caller falls back to iframe)
+ *  2. Call Jackettio → Real-Debrid → follow redirect → direct HTTPS URL
+ *  3. Return StreamResult or null
  *
- * StreamResult: { success, url, mimeType, nativeUrl?, name, provider, allStreams[] }
- *
- * nativeUrl is included when the source is a non-native container (e.g. MKV).
- * Capable browsers (Chrome) can use nativeUrl directly, skipping transcode latency.
- * Incompatible browsers (Firefox) fall back to url (HLS transcode via MediaFlow).
+ * StreamResult: { success, url, mimeType, name, provider, allStreams[] }
  */
 
 const JackettioProvider = require('./providers/jackettio');
@@ -20,18 +16,6 @@ const TMDBService = require('../api/tmdb');
 
 const jackettio = new JackettioProvider();
 const tmdb      = new TMDBService();
-
-// Route MediaFlow URLs through the Node.js server's /api/mf proxy so the
-// browser never needs to reach MediaFlow directly (avoids mixed-content and
-// keeps MediaFlow off the public internet).
-function toProxyUrl(url) {
-    try {
-        const u = new URL(url);
-        return '/api/mf' + u.pathname + u.search;
-    } catch {
-        return url;
-    }
-}
 
 // Follow Jackettio's redirect chain to get the actual RD CDN URL.
 // Returns null if the link is dead (4xx/5xx from RD).
@@ -55,19 +39,6 @@ async function resolveRedirect(url) {
     }
 }
 
-// Validate a direct RD CDN URL — returns false if RD says the link is dead.
-async function validateRdUrl(url) {
-    try {
-        const res = await fetch(url, {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(8000),
-        });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
 async function resolve(content) {
     if (!content?.tmdbId) return null;
 
@@ -83,76 +54,13 @@ async function resolve(content) {
         const stream = await jackettio.getStream({ ...content, imdbId });
         if (!stream) return null;
 
-        // MediaFlow URL — check if it needs upgrading to HLS transcoding
-        if (stream.url.includes('/proxy/stream') || stream.url.includes('/proxy/hls/')) {
-            let finalUrl = stream.url;
-            let mimeType = 'hls';
-
-            if (stream.url.includes('/proxy/stream')) {
-                const targetParam = new URL(stream.url).searchParams.get('d') || '';
-                const fileExt = targetParam.toLowerCase().split('?')[0].split('.').pop();
-                const native = ['mp4', 'webm', 'mov'].includes(fileExt);
-
-                if (native) {
-                    mimeType = 'mp4';
-                } else {
-                    // Return both transcode URL (universal) and raw RD URL (capable browsers)
-                    const transcodeUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
-                    const rdUrl = new URL(stream.url).searchParams.get('d') || toProxyUrl(stream.url);
-                    // Validate the RD link before handing it to the client — catches deleted/expired torrents.
-                    const rdOk = await validateRdUrl(rdUrl);
-                    if (!rdOk) {
-                        console.warn(`[StreamResolver] RD link dead (${rdUrl.slice(0, 80)}…) — skipping stream`);
-                        return null;
-                    }
-                    console.log(`[StreamResolver] serving "${stream.name}" via MediaFlow HLS (${fileExt})`);
-                    return {
-                        ...stream,
-                        url:       toProxyUrl(transcodeUrl),
-                        mimeType:  'hls',
-                        nativeUrl: rdUrl,
-                    };
-                }
-            }
-
-            return { ...stream, url: toProxyUrl(finalUrl), mimeType };
-        }
-
-        // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
         const finalUrl = await resolveRedirect(stream.url);
         if (!finalUrl) return null;
 
-        // Redirect may have resolved to a MediaFlow /proxy/stream URL — upgrade if needed
-        if (finalUrl.includes('/proxy/stream')) {
-            const targetParam = new URL(finalUrl).searchParams.get('d') || '';
-            const resolvedExt = targetParam.toLowerCase().split('?')[0].split('.').pop();
-            const native = ['mp4', 'webm', 'mov'].includes(resolvedExt);
-            if (native) {
-                console.log(`[StreamResolver] MediaFlow (via redirect): native ${resolvedExt}`);
-                return { ...stream, url: toProxyUrl(finalUrl), mimeType: 'mp4' };
-            }
-            const transcodeUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
-            // nativeUrl is the raw RD CDN URL — Chrome can stream it directly, no proxy hop
-            const rdUrl = new URL(finalUrl).searchParams.get('d') || toProxyUrl(finalUrl);
-            const rdOk = await validateRdUrl(rdUrl);
-            if (!rdOk) {
-                console.warn(`[StreamResolver] RD link dead (via redirect) — skipping stream`);
-                return null;
-            }
-            console.log(`[StreamResolver] serving "${stream.name}" via MediaFlow HLS redirect (${resolvedExt})`);
-            return {
-                ...stream,
-                url:       toProxyUrl(transcodeUrl),
-                mimeType:  'hls',
-                nativeUrl: rdUrl,
-            };
-        }
-
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
-        const mimeType = filename.endsWith('.m3u8') ? 'hls' : 'mp4';
+        console.log(`[StreamResolver] serving "${stream.name}" → ${filename}`);
 
-        console.log(`[StreamResolver] serving "${stream.name}" direct (${filename})`);
-        return { ...stream, url: finalUrl, mimeType };
+        return { ...stream, url: finalUrl, mimeType: 'mp4' };
     } catch (err) {
         console.error('[StreamResolver]', err.message);
         return null;

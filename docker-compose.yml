@@ -1,29 +1,11 @@
 services:
 
-  # ── MediaFlow Proxy ───────────────────────────────────────────────────────────
-  # Proxies and remuxes RD streams to HLS so the browser <video> tag can play
-  # any format (MKV, AVI, etc.) natively. Exposed on port 8888.
-  # Set MEDIAFLOW_PUBLIC_URL=http://<your-server-ip>:8888 in your stack env vars.
-  mediaflow:
-    image: mhdzumair/mediaflow-proxy
-    container_name: mediaflow
-    restart: unless-stopped
-    ports:
-      - "8888:8888"
-    environment:
-      - API_PASSWORD=${MEDIAFLOW_API_PASSWORD:-heartstream}
-      - TRANSCODE_VIDEO_PRESET=${TRANSCODE_VIDEO_PRESET:-ultrafast}
-    networks:
-      - heartstream-network
-
   # ── Jackettio ─────────────────────────────────────────────────────────────────
   # Bridges torrent indexers + Real-Debrid into a single stream API.
   jackettio:
     build: https://github.com/arvida42/jackettio.git
     container_name: jackettio
     restart: unless-stopped
-    depends_on:
-      - mediaflow
     environment:
       - PORT=4000
       - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
@@ -42,7 +24,6 @@ services:
     restart: unless-stopped
     depends_on:
       - jackettio
-      - mediaflow
     ports:
       - "3000:3000"
     environment:
@@ -55,9 +36,6 @@ services:
       - JACKETTIO_INDEXERS=${JACKETTIO_INDEXERS:-thepiratebay,yts,eztv,therarbg}
       - JACKETTIO_QUALITIES=${JACKETTIO_QUALITIES:-720,1080,2160}
       - JACKETTIO_BLACKLIST=${JACKETTIO_BLACKLIST:-}
-      - MEDIAFLOW_PUBLIC_URL=${MEDIAFLOW_PUBLIC_URL:-}
-      - MEDIAFLOW_INTERNAL_URL=${MEDIAFLOW_INTERNAL_URL:-http://mediaflow:8888}
-      - MEDIAFLOW_API_PASSWORD=${MEDIAFLOW_API_PASSWORD:-heartstream}
     volumes:
       - heartstream-data:/data
     networks:

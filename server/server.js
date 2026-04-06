@@ -1,8 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
-const { spawn } = require('child_process');
-const http = require('http');
 const axios = require('axios');
 const db = require('./database');
 const ContentService = require('./api/contentService');
@@ -161,121 +159,6 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
     return res.status(404).json({ success: false, error: 'No stream available for this title.' });
 });
 
-// ── MediaFlow internal proxy ──────────────────────────────────────────────────
-// Forwards /api/mf/* → internal MediaFlow, keeping MediaFlow off the public
-// internet. HLS manifests are rewritten so segment URLs also route through here.
-
-const MEDIAFLOW_INTERNAL = (process.env.MEDIAFLOW_INTERNAL_URL || 'http://mediaflow:8888').replace(/\/$/, '');
-const _mfUrl = new URL(MEDIAFLOW_INTERNAL);
-
-app.use('/api/mf', (req, res) => {
-    const opts = {
-        hostname: _mfUrl.hostname,
-        port:     _mfUrl.port || 80,
-        path:     req.url,   // everything after /api/mf, including query string
-        method:   req.method,
-        headers:  {},
-    };
-    if (req.headers.range) opts.headers['range'] = req.headers.range;
-
-    const proxy = http.request(opts, upstream => {
-        const ct = upstream.headers['content-type'] || '';
-        const isManifest = ct.includes('mpegurl') || req.url.includes('.m3u8');
-
-        res.status(upstream.statusCode);
-        ['content-type', 'content-range', 'accept-ranges', 'cache-control'].forEach(h => {
-            if (upstream.headers[h]) res.setHeader(h, upstream.headers[h]);
-        });
-
-        if (req.method === 'HEAD') return res.end();
-
-        const cl = parseInt(upstream.headers['content-length'] || '0');
-        const looksLikeManifest = isManifest && (cl === 0 || cl < 512 * 1024);
-
-        if (looksLikeManifest) {
-            // Buffer and rewrite internal MediaFlow URLs → /api/mf so all
-            // segment requests also route through this proxy.
-            // Use Buffer array (not string concat) to avoid max string length crash.
-            const chunks = [];
-            let size = 0;
-            upstream.on('data', chunk => {
-                size += chunk.length;
-                if (size > 512 * 1024) {
-                    // Unexpectedly large — not a real manifest, switch to piping
-                    upstream.removeAllListeners('data');
-                    upstream.removeAllListeners('end');
-                    res.write(Buffer.concat(chunks));
-                    upstream.pipe(res);
-                    return;
-                }
-                chunks.push(chunk);
-            });
-            upstream.on('end', () => {
-                const body = Buffer.concat(chunks).toString('utf8');
-                // Rewrite MediaFlow URLs → /api/mf/ proxy path.
-                // Covers both absolute (https://host/proxy/) and relative (/proxy/) forms,
-                // since transcode playlists use relative segment paths.
-                res.send(body.replace(/(?:https?:\/\/[^/"'\s]+)?\/proxy\//g, '/api/mf/proxy/'));
-            });
-        } else {
-            upstream.pipe(res);
-        }
-    });
-
-    proxy.on('error', err => {
-        console.error('[MF proxy]', err.message);
-        if (!res.headersSent) res.status(502).end();
-    });
-
-    proxy.end();
-});
-
-// ── FFmpeg remux proxy ────────────────────────────────────────────────────────
-// Remuxes any container (MKV, etc.) to fragmented MP4 on-the-fly so the
-// browser <video> tag can play it. Video is stream-copied (no re-encode);
-// audio is transcoded to AAC only if needed. Near-zero CPU.
-
-app.get('/api/proxy/stream', (req, res) => {
-    const url = req.query.url;
-    if (!url) return res.status(400).end();
-
-    let parsed;
-    try { parsed = new URL(url); } catch { return res.status(400).end(); }
-
-    // Only proxy trusted sources: Real-Debrid links and internal Jackettio download URLs
-    const host = parsed.hostname.toLowerCase();
-    const allowed = host === 'jackettio' || host.endsWith('.real-debrid.com') || host.endsWith('.debrid.it');
-    if (!allowed) {
-        return res.status(403).json({ error: 'URL not allowed' });
-    }
-
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    res.setHeader('Cache-Control', 'no-cache');
-
-    const ff = spawn('ffmpeg', [
-        '-loglevel', 'error',
-        '-fflags', '+nobuffer+discardcorrupt',
-        '-probesize', '32768',       // don't analyse more than 32KB before starting
-        '-analyzeduration', '0',     // skip stream analysis — start output immediately
-        '-i', url,
-        '-c:v', 'copy',
-        '-c:a', 'aac', '-b:a', '192k',
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-        '-frag_duration', '500000',  // 500ms fragments — first bytes reach browser faster
-        '-f', 'mp4',
-        'pipe:1'
-    ]);
-
-    ff.stdout.pipe(res);
-    ff.stderr.on('data', d => console.error('[FFmpeg]', d.toString().trim()));
-    ff.on('error', err => {
-        console.error('[FFmpeg] spawn error:', err.message);
-        if (!res.headersSent) res.status(500).end();
-    });
-
-    req.on('close', () => ff.kill('SIGKILL'));
-});
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
