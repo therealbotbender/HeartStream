@@ -22,6 +22,8 @@ let currentHls        = null;
 let countdownTimer    = null;
 let hideControlsTimer = null;
 let introTimes        = null; // { intro_start, intro_end } seconds
+let autoSkipIntro     = localStorage.getItem('hs-auto-skip-intro') === 'true';
+let autoPlayNext      = localStorage.getItem('hs-auto-play-next')  === 'true';
 
 export function initPlayer() {
     videoEl        = document.getElementById('video-player');
@@ -56,6 +58,26 @@ export function initPlayer() {
 
     document.getElementById('skip-intro-btn')?.addEventListener('click', skipIntro);
     document.getElementById('submit-intro-btn')?.addEventListener('click', openSubmitIntroModal);
+
+    // Auto-skip toggle
+    const autoSkipEl = document.getElementById('auto-skip-toggle');
+    if (autoSkipEl) {
+        autoSkipEl.checked = autoSkipIntro;
+        autoSkipEl.addEventListener('change', () => {
+            autoSkipIntro = autoSkipEl.checked;
+            localStorage.setItem('hs-auto-skip-intro', autoSkipIntro);
+        });
+    }
+
+    // Auto-play-next toggle
+    const autoPlayEl = document.getElementById('auto-play-next-toggle');
+    if (autoPlayEl) {
+        autoPlayEl.checked = autoPlayNext;
+        autoPlayEl.addEventListener('change', () => {
+            autoPlayNext = autoPlayEl.checked;
+            localStorage.setItem('hs-auto-play-next', autoPlayNext);
+        });
+    }
 
     wireSubmitIntroModal();
     initCustomControls();
@@ -346,12 +368,17 @@ async function fetchIntroTimes() {
 }
 
 function checkSkipIntro() {
-    const btn = document.getElementById('skip-intro-btn');
-    if (!btn) return;
-    if (!introTimes) { btn.style.display = 'none'; return; }
+    const container = document.getElementById('skip-intro-container');
+    if (!container) return;
+    if (!introTimes) { container.style.display = 'none'; return; }
     const t = videoEl.currentTime;
     const inIntro = t >= introTimes.intro_start && t < introTimes.intro_end;
-    btn.style.display = inIntro ? 'block' : 'none';
+    if (inIntro) {
+        container.style.display = 'flex';
+        if (autoSkipIntro) { skipIntro(); return; }
+    } else {
+        container.style.display = 'none';
+    }
 }
 
 function skipIntro() {
@@ -520,6 +547,11 @@ function scheduleNextEpisode() {
     const next = getNextEpisode();
     if (!next) return; // Last episode — nothing to queue
 
+    if (autoPlayNext) {
+        playNextEpisode();
+        return;
+    }
+
     const panel      = document.getElementById('next-episode-panel');
     const countdownEl = document.getElementById('auto-play-countdown');
     const timerSpan  = document.getElementById('countdown-timer');
@@ -578,7 +610,8 @@ export function closePlayer() {
     clearInterval(countdownTimer);
     clearTimeout(hideControlsTimer);
     hideNextEpisodeUI();
-    document.getElementById('skip-intro-btn').style.display   = 'none';
+    const skipContainer = document.getElementById('skip-intro-container');
+    if (skipContainer) skipContainer.style.display = 'none';
     document.getElementById('submit-intro-modal')?.classList.remove('active');
     lastSavedTime = 0;
     introTimes    = null;

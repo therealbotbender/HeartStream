@@ -223,18 +223,28 @@
                     </div>
                     <div class="video-overlay-controls">
                         <button id="unmute-btn" class="unmute-btn" style="display: none;">🔇 Tap to unmute</button>
-                        <button id="skip-intro-btn" class="skip-intro-btn" style="display: none;">
-                            Skip Intro
-                        </button>
+                        <div id="skip-intro-container" class="skip-intro-container" style="display: none;">
+                            <button id="skip-intro-btn" class="skip-intro-btn">Skip Intro</button>
+                            <label class="auto-toggle" title="Always skip intros automatically">
+                                <input type="checkbox" id="auto-skip-toggle">
+                                <span class="auto-toggle-track"></span>
+                                <span class="auto-toggle-label">Always</span>
+                            </label>
+                        </div>
                         <button id="submit-intro-btn" class="submit-intro-btn" style="display: none;">
                             Set Intro Times
                         </button>
                         <div id="next-episode-panel" class="next-episode-panel" style="display: none;">
                             <div class="next-episode-info">
-                                <h4>Next Episode</h4>
+                                <h4>Up Next</h4>
                                 <p id="next-episode-title">Loading...</p>
                             </div>
-                            <button id="play-next-btn" class="play-next-btn">Play Next</button>
+                            <label class="auto-toggle auto-toggle-light" title="Automatically play next episode">
+                                <input type="checkbox" id="auto-play-next-toggle">
+                                <span class="auto-toggle-track"></span>
+                                <span class="auto-toggle-label">Auto-play</span>
+                            </label>
+                            <button id="play-next-btn" class="play-next-btn">Play Now</button>
                             <button id="cancel-next-btn" class="cancel-next-btn">&times;</button>
                         </div>
                         <div id="auto-play-countdown" class="auto-play-countdown" style="display: none;">
