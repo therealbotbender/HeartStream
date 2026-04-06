@@ -294,6 +294,7 @@ async function loadDirect(result) {
     showControls();
 
     // Fetch intro times in background (TV only)
+    console.log('[intro] type check', state.player.type, 'season', state.player.season);
     if (state.player.type === 'tv' && state.player.season != null) {
         fetchIntroTimes();
     }
@@ -357,6 +358,13 @@ export function setDubPref(wantDub) {
 // ── Skip intro ────────────────────────────────────────────────────────────────
 
 async function fetchIntroTimes() {
+    console.log('[intro] fetch start', {
+        contentId: state.player.contentId,
+        season:    state.player.season,
+        episode:   state.player.episode,
+        tmdbId:    state.player.tmdbId,
+        type:      state.player.type,
+    });
     try {
         const data = await API.intro.get(
             state.player.contentId,
@@ -365,9 +373,11 @@ async function fetchIntroTimes() {
             state.player.tmdbId,
             state.player.type
         );
+        console.log('[intro] response', data);
         introTimes  = (data?.intro_start != null)  ? data : null;
         endingTimes = (data?.ending_start != null)  ? data : null;
-    } catch {
+    } catch (err) {
+        console.error('[intro] fetch error', err);
         introTimes  = null;
         endingTimes = null;
     }
