@@ -25,7 +25,7 @@ services:
     ports:
       - "9117:9117"
     volumes:
-      - /opt/heartstream/jackett:/config
+      - ./config/jackett:/config
     networks:
       - heartstream-network
 
