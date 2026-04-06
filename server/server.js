@@ -160,6 +160,36 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
 });
 
 
+// ── Jackett UI proxy ─────────────────────────────────────────────────────────
+// Forwards /jackett/* → internal Jackett container so the UI is reachable
+// without exposing port 9117. Access at http://<host>:3000/jackett/
+
+const http = require('http');
+const JACKETT_HOST = 'jackett';
+const JACKETT_PORT = 9117;
+
+app.use('/jackett', (req, res) => {
+    const opts = {
+        hostname: JACKETT_HOST,
+        port:     JACKETT_PORT,
+        path:     '/jackett' + req.url,
+        method:   req.method,
+        headers:  { ...req.headers, host: `${JACKETT_HOST}:${JACKETT_PORT}` },
+    };
+    const proxy = http.request(opts, upstream => {
+        res.status(upstream.statusCode);
+        Object.entries(upstream.headers).forEach(([k, v]) => {
+            if (k !== 'transfer-encoding') res.setHeader(k, v);
+        });
+        upstream.pipe(res);
+    });
+    proxy.on('error', err => {
+        console.error('[Jackett proxy]', err.message);
+        if (!res.headersSent) res.status(502).send('Jackett unavailable');
+    });
+    req.pipe(proxy);
+});
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 app.get('/api/users', async (req, res) => {
