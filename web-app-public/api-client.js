@@ -46,7 +46,7 @@ export const API = (() => {
     // ── Content ──────────────────────────────────────────────────────────────
 
     const content = {
-        trending: () => get('/api/content/trending'),
+        trending: (timeWindow) => get('/api/content/trending', timeWindow ? { timeWindow } : {}),
 
         movies: (opts = {}) => get('/api/content/movies', {
             page:            opts.page,

@@ -29,7 +29,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.get('/api/content/trending', async (req, res) => {
     try {
-        res.json(await content.getTrendingContent());
+        res.json(await content.getTrendingContent(req.query.timeWindow));
     } catch (err) {
         console.error('/api/content/trending', err.message);
         res.status(500).json({ error: 'Failed to fetch trending content' });

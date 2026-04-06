@@ -32,22 +32,28 @@ class ContentService {
     }
 
     // Main content fetching methods
-    async getTrendingContent() {
-        const cacheKey = this.getCacheKey('trending');
+    async getTrendingContent(timeWindow = 'day') {
+        const tw = timeWindow === 'week' ? 'week' : 'day';
+        const cacheKey = this.getCacheKey('trending', tw);
         const cached = this.getFromCache(cacheKey);
         if (cached) return cached;
 
         try {
-            const content = await this.tmdb.getCinebyContent();
-
-            // Note: Source filtering disabled for trending to maintain fast loading
-            // Trending content is usually popular and more likely to have sources
-
+            const [trendingMovies, trendingTV] = await Promise.all([
+                this.tmdb.getTrendingMovies(tw),
+                this.tmdb.getTrendingTV(tw)
+            ]);
+            const content = {
+                trending: {
+                    movies: trendingMovies.results.filter(m => m.poster_path).map(m => this.tmdb.transformMovie(m)),
+                    tv:     trendingTV.results.filter(t => t.poster_path).map(t => this.tmdb.transformTV(t))
+                }
+            };
             this.setCache(cacheKey, content);
             return content;
         } catch (error) {
             console.error('Error fetching trending content:', error);
-            return { trending: { movies: [], tv: [] }, popular: { movies: [], tv: [] } };
+            return { trending: { movies: [], tv: [] } };
         }
     }
 
