@@ -414,35 +414,20 @@
         <div id="content-detail-modal" class="modal">
             <div class="modal-content content-detail-content">
                 <button class="close-modal" id="close-detail-modal">&times;</button>
-                <div class="content-detail-body">
-                    <div class="content-detail-poster">
-                        <img id="detail-poster" src="" alt="Poster">
-                    </div>
-                    <div class="content-detail-info">
+
+                <!-- Hero row: poster + title/meta -->
+                <div class="detail-hero">
+                    <img id="detail-poster" class="detail-hero-poster" src="" alt="Poster">
+                    <div class="detail-hero-info">
                         <h2 id="detail-title"></h2>
                         <div id="detail-meta" class="detail-meta"></div>
                         <p id="detail-overview" class="detail-overview"></p>
 
-                        <!-- Movie Progress Bar -->
+                        <!-- Movie progress -->
                         <div id="detail-movie-progress" class="detail-movie-progress" style="display: none;">
-                            <div class="detail-movie-progress-label">
-                                <span id="detail-movie-progress-text">Watched: 0%</span>
-                            </div>
+                            <span id="detail-movie-progress-text" class="detail-progress-text">Watched: 0%</span>
                             <div class="detail-movie-progress-bar">
                                 <div id="detail-movie-progress-fill" class="detail-movie-progress-fill"></div>
-                            </div>
-                        </div>
-
-                        <!-- Episode Selection (TV Shows only) -->
-                        <div id="detail-episodes-section" class="detail-episodes-section" style="display: none;">
-                            <h3>Episodes</h3>
-                            <div class="detail-season-selector">
-                                <label for="detail-season-dropdown">Season:</label>
-                                <select id="detail-season-dropdown" class="detail-season-dropdown"></select>
-                                <button id="detail-continue-btn" class="detail-continue-btn">▶ Continue Watching</button>
-                            </div>
-                            <div id="detail-episodes-grid" class="detail-episodes-grid">
-                                <!-- Episodes will be loaded here -->
                             </div>
                         </div>
 
@@ -450,6 +435,17 @@
                             <button id="detail-play-btn" class="detail-play-btn">▶ Play</button>
                             <button id="detail-add-playlist-btn" class="detail-secondary-btn">+ Add to Playlist</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Episodes (TV only) -->
+                <div id="detail-episodes-section" class="detail-episodes-section" style="display: none;">
+                    <div class="detail-season-selector">
+                        <span class="episodes-heading">Episodes</span>
+                        <select id="detail-season-dropdown" class="detail-season-dropdown"></select>
+                    </div>
+                    <div id="detail-episodes-grid" class="detail-episodes-grid">
+                        <!-- populated by app.js -->
                     </div>
                 </div>
             </div>

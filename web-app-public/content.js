@@ -137,30 +137,20 @@ export function buildGenreRowShell(title, genreId, type) {
 // ── Episode card ──────────────────────────────────────────────────────────────
 
 export function buildEpisodeCard(ep, watchedProgress) {
-    const thumb = ep.thumbnail
-        ? `${TMDB_IMG_BACKDROP}${ep.thumbnail}`
-        : '/icons/placeholder.png';
-
     const pct = watchedProgress ? Math.round(watchedProgress * 100) : 0;
+    const btnLabel = pct >= 90 ? '▶ Watch Again' : pct > 0 ? '▶ Continue' : '▶ Play';
     const progressBar = pct > 0
-        ? `<div class="episode-progress-bar"><div class="episode-progress-fill" style="width:${pct}%"></div></div>`
-        : '';
-    const watched = pct >= 90 ? ' episode-watched' : '';
+        ? `<div class="ep-progress"><div class="ep-progress-fill" style="width:${pct}%"></div></div>`
+        : '<div class="ep-progress ep-progress--empty"></div>';
 
     return `
-        <div class="episode-card${watched}"
+        <div class="episode-card"
              data-episode="${ep.episodeNumber}"
              data-season="${ep.seasonNumber}">
-            <div class="episode-thumb">
-                <img src="${thumb}" alt="Episode ${ep.episodeNumber}" loading="lazy"
-                     onerror="this.src='/icons/placeholder.png'">
-                ${progressBar}
-                <div class="episode-overlay"><span>▶</span></div>
-            </div>
-            <div class="episode-info">
-                <span class="episode-number">S${ep.seasonNumber}E${ep.episodeNumber}</span>
-                <span class="episode-title">${escapeHtml(ep.title || 'Episode ' + ep.episodeNumber)}</span>
-            </div>
+            <span class="ep-label">E${ep.episodeNumber}</span>
+            <span class="ep-title">${escapeHtml(ep.title || 'Episode ' + ep.episodeNumber)}</span>
+            ${progressBar}
+            <button class="ep-play-btn">${btnLabel}</button>
         </div>
     `.trim();
 }

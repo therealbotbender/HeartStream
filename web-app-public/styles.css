@@ -1122,13 +1122,97 @@ body {
 }
 
 .detail-episodes-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.75rem;
-    max-height: 340px;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     max-height: 400px;
     overflow-y: auto;
+}
+
+/* Episode row layout (scoped to detail modal) */
+.detail-episodes-grid .episode-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0;
+    backdrop-filter: none;
+    transform: none;
+    box-shadow: none;
+}
+
+.detail-episodes-grid .episode-card:last-child {
+    border-bottom: none;
+}
+
+.detail-episodes-grid .episode-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: none;
+    box-shadow: none;
+    border-color: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.detail-episodes-grid .episode-card::before,
+.detail-episodes-grid .episode-card::after {
+    display: none;
+}
+
+.detail-episodes-grid .ep-label {
+    font-size: 0.8rem;
+    color: rgba(139, 92, 246, 0.85);
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 2.5rem;
+    flex-shrink: 0;
+}
+
+.detail-episodes-grid .ep-title {
+    flex: 1;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.85);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-episodes-grid .ep-progress {
+    width: 72px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.detail-episodes-grid .ep-progress--empty {
+    background: transparent;
+}
+
+.detail-episodes-grid .ep-progress-fill {
+    height: 100%;
+    background: #8b5cf6;
+    border-radius: 2px;
+}
+
+.detail-episodes-grid .ep-play-btn {
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0.3rem 0.65rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.detail-episodes-grid .episode-card:hover .ep-play-btn {
+    background: rgba(139, 92, 246, 0.3);
+    border-color: rgba(139, 92, 246, 0.6);
 }
 
 .detail-episode-card {
