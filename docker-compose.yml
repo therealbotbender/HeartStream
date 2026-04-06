@@ -13,7 +13,7 @@ services:
       - PGID=1000
       - TZ=${TZ:-America/New_York}
     volumes:
-      - jackett-config:/config
+      - /opt/heartstream/jackett:/config
     ports:
       - "9117:9117"
     networks:
@@ -70,7 +70,6 @@ services:
       start_period: 60s
 
 volumes:
-  jackett-config:
   jackettio-data:
   heartstream-data:
 
