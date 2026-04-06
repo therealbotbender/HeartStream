@@ -22,7 +22,7 @@ services:
     networks:
       - heartstream-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9117/api/v2.0/indexers?_apikey=5984118c7b886ba38420de8b0208f87c"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9117/api/v2.0/indexers?_apikey=${JACKETT_API_KEY:-5984118c7b886ba38420de8b0208f87c}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,7 +32,7 @@ services:
   # Stremio addon: queries Jackett indexers + Real-Debrid → direct HTTPS stream URLs.
   # Config is built programmatically in streamResolver.js from env vars — no UI needed.
   jackettio:
-    image: ghcr.io/arvida42/jackettio:latest
+    build: https://github.com/arvida42/jackettio.git
     container_name: jackettio
     restart: unless-stopped
     depends_on:
@@ -41,7 +41,7 @@ services:
     environment:
       - PORT=4000
       - JACKETT_URL=http://jackett:9117
-      - JACKETT_API_KEY=5984118c7b886ba38420de8b0208f87c
+      - JACKETT_API_KEY=${JACKETT_API_KEY:-5984118c7b886ba38420de8b0208f87c}
       - TMDB_ACCESS_TOKEN=${TMDB_ACCESS_TOKEN}
       - DATA_FOLDER=/data
     volumes:
