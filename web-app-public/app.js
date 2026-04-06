@@ -233,6 +233,7 @@ function observeGenreRows(container, loadFn) {
 
 const CATEGORIES = {
     movie: [
+        { label: 'Trending', trending: true, subs: [] },
         { label: 'Action',      genreIds: [28],    subs: [
             { label: 'Superhero', keyword: 9715 },
             { label: 'War',       genreIds: [28, 10752] },
@@ -274,6 +275,7 @@ const CATEGORIES = {
         ]},
     ],
     tv: [
+        { label: 'Trending', trending: true, subs: [] },
         { label: 'Drama',              genreIds: [18],    subs: [
             { label: 'Crime',   genreIds: [18, 80] },
             { label: 'K-Drama', language: 'ko' },
@@ -399,11 +401,25 @@ function renderSubPills(mt) {
 async function renderCategoryContent(mt) {
     const { mainIdx, subIdx } = catState[mt];
     const main = CATEGORIES[mt][mainIdx];
-    if (subIdx !== null || !main.subs.length) {
+    if (main.trending) {
+        await renderTrendingGrid(mt);
+    } else if (subIdx !== null || !main.subs.length) {
         await renderFilteredGrid(mt, 1);
     } else {
         renderSubRows(mt);
     }
+}
+
+async function renderTrendingGrid(mt) {
+    const container = document.getElementById(SECTION_IDS[mt].content);
+    container.innerHTML = '<p class="loading-msg">Loading...</p>';
+    const data  = await API.content.trending().catch(() => ({ trending: { movies: [], tv: [] } }));
+    const items = mt === 'movie'
+        ? (data.trending?.movies || [])
+        : (data.trending?.tv    || []);
+    container.innerHTML = `<div class="content-grid cat-grid-content"></div>`;
+    container.querySelector('.cat-grid-content').innerHTML =
+        items.length ? items.map(buildCard).join('') : '<p class="empty-msg">Nothing trending right now.</p>';
 }
 
 function renderSubRows(mt) {
