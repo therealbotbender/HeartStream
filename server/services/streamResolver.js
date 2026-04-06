@@ -78,14 +78,15 @@ async function resolve(content) {
                 if (native) {
                     mimeType = 'mp4';
                 } else {
-                    // Return both transcode URL (universal) and raw stream URL (capable browsers)
+                    // Return both transcode URL (universal) and raw RD URL (capable browsers)
                     const transcodeUrl = stream.url.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+                    const rdUrl = new URL(stream.url).searchParams.get('d') || toProxyUrl(stream.url);
                     console.log(`[StreamResolver] MediaFlow: upgrading ${fileExt} → HLS transcode (nativeUrl available)`);
                     return {
                         ...stream,
                         url:       toProxyUrl(transcodeUrl),
                         mimeType:  'hls',
-                        nativeUrl: toProxyUrl(stream.url),
+                        nativeUrl: rdUrl,
                     };
                 }
             }
@@ -106,12 +107,14 @@ async function resolve(content) {
                 return { ...stream, url: toProxyUrl(finalUrl), mimeType: 'mp4' };
             }
             const transcodeUrl = finalUrl.replace('/proxy/stream', '/proxy/transcode/playlist.m3u8');
+            // nativeUrl is the raw RD CDN URL — Chrome can stream it directly, no proxy hop
+            const rdUrl = new URL(finalUrl).searchParams.get('d') || toProxyUrl(finalUrl);
             console.log(`[StreamResolver] MediaFlow (via redirect): upgrading ${resolvedExt} → HLS transcode (nativeUrl available)`);
             return {
                 ...stream,
                 url:       toProxyUrl(transcodeUrl),
                 mimeType:  'hls',
-                nativeUrl: toProxyUrl(finalUrl),
+                nativeUrl: rdUrl,
             };
         }
 
