@@ -2,6 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const { spawn } = require('child_process');
+const http = require('http');
 const db = require('./database');
 const ContentService = require('./api/contentService');
 const streamResolver = require('./services/streamResolver');
@@ -162,38 +163,48 @@ app.get('/api/stream/:type/:tmdbId/:season?/:episode?', async (req, res) => {
 // internet. HLS manifests are rewritten so segment URLs also route through here.
 
 const MEDIAFLOW_INTERNAL = (process.env.MEDIAFLOW_INTERNAL_URL || 'http://mediaflow:8888').replace(/\/$/, '');
+const _mfUrl = new URL(MEDIAFLOW_INTERNAL);
 
-app.use('/api/mf', async (req, res) => {
-    const target = MEDIAFLOW_INTERNAL + req.url;
-    try {
-        const headers = {};
-        if (req.headers.range) headers['range'] = req.headers.range;
+app.use('/api/mf', (req, res) => {
+    const opts = {
+        hostname: _mfUrl.hostname,
+        port:     _mfUrl.port || 80,
+        path:     req.url,   // everything after /api/mf, including query string
+        method:   req.method,
+        headers:  {},
+    };
+    if (req.headers.range) opts.headers['range'] = req.headers.range;
 
-        const upstream = await fetch(target, { method: req.method, headers,
-            signal: AbortSignal.timeout(30000) });
+    const proxy = http.request(opts, upstream => {
+        const ct = upstream.headers['content-type'] || '';
+        const isManifest = ct.includes('mpegurl') || req.url.includes('.m3u8');
 
-        res.status(upstream.status);
-        const ct = upstream.headers.get('content-type') || '';
-        res.setHeader('Content-Type', ct);
-        ['content-range', 'accept-ranges', 'cache-control'].forEach(h => {
-            const v = upstream.headers.get(h);
-            if (v) res.setHeader(h, v);
+        res.status(upstream.statusCode);
+        ['content-type', 'content-range', 'accept-ranges', 'cache-control'].forEach(h => {
+            if (upstream.headers[h]) res.setHeader(h, upstream.headers[h]);
         });
 
         if (req.method === 'HEAD') return res.end();
 
-        // Rewrite absolute internal MediaFlow URLs → /api/mf/... so all HLS
-        // segment requests also come through this proxy.
-        if (ct.includes('mpegurl') || req.url.includes('.m3u8')) {
-            const body = (await upstream.text()).replaceAll(MEDIAFLOW_INTERNAL, '/api/mf');
-            return res.send(body);
+        if (isManifest) {
+            // Rewrite absolute internal MediaFlow URLs → /api/mf so segment
+            // requests also route through this proxy.
+            let body = '';
+            upstream.on('data', chunk => { body += chunk; });
+            upstream.on('end', () => {
+                res.send(body.replaceAll(MEDIAFLOW_INTERNAL, '/api/mf'));
+            });
+        } else {
+            upstream.pipe(res);
         }
+    });
 
-        upstream.body.pipe(res);
-    } catch (err) {
+    proxy.on('error', err => {
         console.error('[MF proxy]', err.message);
         if (!res.headersSent) res.status(502).end();
-    }
+    });
+
+    proxy.end();
 });
 
 // ── FFmpeg remux proxy ────────────────────────────────────────────────────────
