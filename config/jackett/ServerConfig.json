@@ -12,7 +12,7 @@
   "CacheEnabled": true,
   "CacheTtl": 2100,
   "CacheMaxResultsPerIndexer": 1000,
-  "FlareSolverrUrl": "",
+  "FlareSolverrUrl": "http://flaresolverr:8191",
   "FlareSolverrApiKey": "",
   "FlareSolverrMaxTimeout": 55000,
   "OmdbApiKey": "",
