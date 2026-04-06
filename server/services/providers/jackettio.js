@@ -13,8 +13,10 @@
  *   JACKETTIO_QUALITIES  — comma-separated quality values in px (default: 720,1080,2160)
  */
 
-const BASE_URL = (process.env.JACKETTIO_URL || 'http://jackettio:4000').replace(/\/$/, '');
-const RD_KEY   = process.env.REALDEBRID_API_KEY || '';
+const BASE_URL          = (process.env.JACKETTIO_URL          || 'http://jackettio:4000').replace(/\/$/, '');
+const RD_KEY            = process.env.REALDEBRID_API_KEY      || '';
+const MEDIAFLOW_URL     = process.env.MEDIAFLOW_PUBLIC_URL    || '';
+const MEDIAFLOW_PASSWORD = process.env.MEDIAFLOW_API_PASSWORD || 'heartstream';
 
 const INDEXERS  = (process.env.JACKETTIO_INDEXERS  || 'thepiratebay,yts,eztv,therarbg').split(',');
 const QUALITIES = (process.env.JACKETTIO_QUALITIES || '720,1080,2160').split(',').map(Number);
@@ -32,12 +34,15 @@ function buildConfig() {
         maxTorrents:            5,
         sortCached:             [['quality', true], ['size', true]],
         sortUncached:           [['seeders', true]],
-        hideUncached:           true,       // only return streams RD has cached = instant play
+        hideUncached:           true,
         priotizePackTorrents:   2,
         forceCacheNextEpisode:  false,
         indexerTimeoutSec:      30,
         metaLanguage:           '',
-        enableMediaFlow:        false,
+        enableMediaFlow:        !!MEDIAFLOW_URL,
+        mediaflowProxyUrl:      MEDIAFLOW_URL,
+        mediaflowApiPassword:   MEDIAFLOW_PASSWORD,
+        mediaflowPublicIp:      '',
     })).toString('base64');
 }
 

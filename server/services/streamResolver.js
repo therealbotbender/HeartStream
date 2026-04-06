@@ -47,7 +47,13 @@ async function resolve(content) {
         const stream = await jackettio.getStream({ ...content, imdbId });
         if (!stream) return null;
 
-        // Follow Jackettio → RD redirect to get the direct CDN URL
+        // MediaFlow URLs are already HLS — no redirect needed
+        if (stream.url.includes('.m3u8') || stream.url.includes('/proxy/hls/') || stream.url.includes('/proxy/stream')) {
+            console.log(`[StreamResolver] MediaFlow HLS stream`);
+            return { ...stream, mimeType: 'hls' };
+        }
+
+        // Otherwise follow Jackettio → RD redirect to get the direct CDN URL
         const finalUrl = await resolveRedirect(stream.url);
         const filename = finalUrl.split('/').pop().split('?')[0].toLowerCase();
         const mimeType = filename.endsWith('.m3u8') ? 'hls' : 'mp4';
