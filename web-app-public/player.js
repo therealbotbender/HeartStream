@@ -293,10 +293,13 @@ async function loadDirect(result) {
     startProgressTimer();
     showControls();
 
-    // Fetch intro times in background (TV only)
-    console.log('[intro] type check', state.player.type, 'season', state.player.season);
+    // Show/hide submit intro button and fetch times (TV only)
+    const submitBtn = document.getElementById('submit-intro-btn');
     if (state.player.type === 'tv' && state.player.season != null) {
+        if (submitBtn) submitBtn.style.display = 'block';
         fetchIntroTimes();
+    } else {
+        if (submitBtn) submitBtn.style.display = 'none';
     }
 }
 
@@ -358,13 +361,6 @@ export function setDubPref(wantDub) {
 // ── Skip intro ────────────────────────────────────────────────────────────────
 
 async function fetchIntroTimes() {
-    console.log('[intro] fetch start', {
-        contentId: state.player.contentId,
-        season:    state.player.season,
-        episode:   state.player.episode,
-        tmdbId:    state.player.tmdbId,
-        type:      state.player.type,
-    });
     try {
         const data = await API.intro.get(
             state.player.contentId,
@@ -373,11 +369,9 @@ async function fetchIntroTimes() {
             state.player.tmdbId,
             state.player.type
         );
-        console.log('[intro] response', data);
         introTimes  = (data?.intro_start != null)  ? data : null;
         endingTimes = (data?.ending_start != null)  ? data : null;
-    } catch (err) {
-        console.error('[intro] fetch error', err);
+    } catch {
         introTimes  = null;
         endingTimes = null;
     }
@@ -658,6 +652,7 @@ export function closePlayer() {
     hideNextEpisodeUI();
     const skipContainer = document.getElementById('skip-intro-container');
     if (skipContainer) skipContainer.style.display = 'none';
+    document.getElementById('submit-intro-btn').style.display   = 'none';
     document.getElementById('submit-intro-modal')?.classList.remove('active');
     lastSavedTime = 0;
     introTimes    = null;
