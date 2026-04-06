@@ -185,22 +185,39 @@
         <div id="video-player-modal" class="modal">
             <div class="modal-content">
                 <div class="video-player-container">
-                    <video id="video-player" controls preload="none" playsinline style="display: none;">
-                        
-                        Your browser does not support the video tag.
-                    </video>
+                    <video id="video-player" preload="none" playsinline style="display: none;"></video>
                     <iframe id="video-iframe" width="100%" height="100%" frameborder="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin" style="display: none;"></iframe>
-                    <div class="video-controls">
-                        <select id="quality-picker" class="quality-picker" style="display:none;" title="Switch Quality"></select>
-                        <div id="dub-toggle" class="dub-toggle" style="display:none;" title="Switch Sub/Dub">
-                            <button class="dub-btn active" id="sub-btn">SUB</button>
-                            <button class="dub-btn" id="dub-btn-el">DUB</button>
+
+                    <!-- Unified custom controls — shown for native video, hidden for iframe -->
+                    <div id="custom-controls" class="custom-controls">
+                        <div class="ctrl-seek-row">
+                            <div id="ctrl-seek-bar" class="ctrl-seek-bar">
+                                <div id="ctrl-seek-fill" class="ctrl-seek-fill"></div>
+                                <div id="ctrl-seek-handle" class="ctrl-seek-handle"></div>
+                            </div>
                         </div>
-                        <button id="select-episode-btn" class="select-episode-btn" style="display: none;" title="Select Episode">
-                            📺 Episodes
-                        </button>
-                        <button id="close-player" class="close-btn">&times;</button>
+                        <div class="ctrl-btn-row">
+                            <div class="ctrl-left">
+                                <button id="ctrl-play" class="ctrl-btn ctrl-play" title="Play/Pause (Space)">▶</button>
+                                <button id="ctrl-mute" class="ctrl-btn" title="Mute (M)">🔊</button>
+                                <input id="ctrl-volume" class="ctrl-volume" type="range" min="0" max="1" step="0.05" value="1">
+                                <span id="ctrl-time" class="ctrl-time">0:00 / 0:00</span>
+                            </div>
+                            <div class="ctrl-right">
+                                <select id="quality-picker" class="quality-picker" style="display:none;" title="Switch Quality"></select>
+                                <div id="dub-toggle" class="dub-toggle" style="display:none;" title="Switch Sub/Dub">
+                                    <button class="dub-btn active" id="sub-btn">SUB</button>
+                                    <button class="dub-btn" id="dub-btn-el">DUB</button>
+                                </div>
+                                <button id="select-episode-btn" class="select-episode-btn" style="display: none;" title="Episodes">📺</button>
+                                <button id="ctrl-fullscreen" class="ctrl-btn" title="Fullscreen (F)">⛶</button>
+                                <button id="close-player" class="close-btn">&times;</button>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Top-right close for iframe (no custom controls) -->
+                    <button id="close-player-iframe" class="close-btn close-btn-iframe" style="display:none;">&times;</button>
                     <div id="stream-reconnect-overlay" class="stream-reconnect-overlay" style="display: none;">
                         <div class="reconnect-content">
                             <div class="reconnect-spinner"></div>

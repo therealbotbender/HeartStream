@@ -1310,13 +1310,103 @@ body {
     display: block;
 }
 
-.video-controls {
+/* ── Custom unified player controls ── */
+.custom-controls {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
-    z-index: 1001;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1002;
     display: flex;
+    flex-direction: column;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    padding: 0.5rem 0.75rem 0.5rem;
+    transition: opacity 0.25s ease;
+}
+.custom-controls.controls-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+.ctrl-seek-row {
+    padding: 0.25rem 0;
+}
+.ctrl-seek-bar {
+    position: relative;
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+    cursor: pointer;
+}
+.ctrl-seek-bar:hover { height: 6px; }
+.ctrl-seek-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: #6366f1;
+    border-radius: 2px;
+    pointer-events: none;
+}
+.ctrl-seek-handle {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.ctrl-seek-bar:hover .ctrl-seek-handle { opacity: 1; }
+.ctrl-btn-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+.ctrl-left, .ctrl-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.ctrl-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: 4px;
+    line-height: 1;
+    transition: background 0.15s;
+}
+.ctrl-btn:hover { background: rgba(255,255,255,0.15); }
+.ctrl-play { font-size: 1.1rem; }
+.ctrl-volume {
+    width: 70px;
+    height: 4px;
+    cursor: pointer;
+    accent-color: #6366f1;
+}
+.ctrl-time {
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    white-space: nowrap;
+    margin-left: 0.25rem;
+}
+
+/* iframe-only close button */
+.close-btn-iframe {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 1002;
+}
+
+.video-controls {
+    display: none; /* replaced by custom-controls */
 }
 
 .episodes-btn {

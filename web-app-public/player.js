@@ -4,8 +4,8 @@
  * Flow:
  *  1. play(contentId, type, tmdbId, season?, episode?) called from app.js
  *  2. Calls /api/stream/* — Jackettio via Real-Debrid
- *  3a. Direct URL returned → load into <video>, track via timeupdate
- *  3b. No direct URL     → load VidKing iframe as fallback
+ *  3a. Direct URL returned → load into <video> with custom controls
+ *  3b. No direct URL     → load VidSrc iframe as fallback
  *  4. Progress saved every 10s, on pause, and on close
  */
 
@@ -13,24 +13,29 @@ import { API } from './api-client.js';
 import { state } from './state.js';
 
 // DOM refs — resolved once in initPlayer()
-let videoEl, iframeEl, modal, closeBtn, dubToggle, subBtn, dubBtnEl, qualityPicker, unmuteBtn;
+let videoEl, iframeEl, modal, closeBtn, closeBtnIframe, dubToggle,
+    subBtn, dubBtnEl, qualityPicker, unmuteBtn, customControls;
 let progressSaveTimer = null;
 let lastSavedTime     = 0;
 let currentHls        = null;
 let countdownTimer    = null;
+let hideControlsTimer = null;
 
 export function initPlayer() {
-    videoEl       = document.getElementById('video-player');
-    iframeEl      = document.getElementById('video-iframe');
-    modal         = document.getElementById('video-player-modal');
-    closeBtn      = document.getElementById('close-player');
-    dubToggle     = document.getElementById('dub-toggle');
-    subBtn        = document.getElementById('sub-btn');
-    dubBtnEl      = document.getElementById('dub-btn-el');
-    qualityPicker = document.getElementById('quality-picker');
-    unmuteBtn     = document.getElementById('unmute-btn');
+    videoEl          = document.getElementById('video-player');
+    iframeEl         = document.getElementById('video-iframe');
+    modal            = document.getElementById('video-player-modal');
+    closeBtn         = document.getElementById('close-player');
+    closeBtnIframe   = document.getElementById('close-player-iframe');
+    dubToggle        = document.getElementById('dub-toggle');
+    subBtn           = document.getElementById('sub-btn');
+    dubBtnEl         = document.getElementById('dub-btn-el');
+    qualityPicker    = document.getElementById('quality-picker');
+    unmuteBtn        = document.getElementById('unmute-btn');
+    customControls   = document.getElementById('custom-controls');
 
     closeBtn.addEventListener('click', closePlayer);
+    closeBtnIframe?.addEventListener('click', closePlayer);
     modal.addEventListener('click', e => { if (e.target === modal) closePlayer(); });
 
     unmuteBtn?.addEventListener('click', () => {
@@ -49,9 +54,140 @@ export function initPlayer() {
     document.getElementById('play-next-btn')?.addEventListener('click', playNextEpisode);
     document.getElementById('cancel-next-btn')?.addEventListener('click', cancelNextEpisode);
     document.getElementById('cancel-auto-play')?.addEventListener('click', cancelNextEpisode);
+
+    initCustomControls();
 }
 
-// Attempt to play; if autoplay is blocked, retry muted and show the unmute button.
+// ── Custom controls ───────────────────────────────────────────────────────────
+
+function initCustomControls() {
+    const playBtn      = document.getElementById('ctrl-play');
+    const muteBtn      = document.getElementById('ctrl-mute');
+    const volumeSlider = document.getElementById('ctrl-volume');
+    const seekBar      = document.getElementById('ctrl-seek-bar');
+    const fsBtn        = document.getElementById('ctrl-fullscreen');
+
+    playBtn?.addEventListener('click', () => {
+        if (videoEl.paused) videoEl.play().catch(() => {});
+        else videoEl.pause();
+    });
+
+    muteBtn?.addEventListener('click', () => {
+        videoEl.muted = !videoEl.muted;
+        updateMuteIcon();
+    });
+
+    volumeSlider?.addEventListener('input', () => {
+        videoEl.volume = parseFloat(volumeSlider.value);
+        videoEl.muted  = videoEl.volume === 0;
+        updateMuteIcon();
+    });
+
+    fsBtn?.addEventListener('click', toggleFullscreen);
+
+    // Seek bar — click or drag
+    seekBar?.addEventListener('mousedown', e => {
+        seekToEvent(e);
+        const onMove = ev => seekToEvent(ev);
+        const onUp   = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+
+    // Sync controls to video state
+    videoEl.addEventListener('timeupdate',     updateSeekBar);
+    videoEl.addEventListener('play',           () => { if (playBtn) playBtn.textContent = '⏸'; });
+    videoEl.addEventListener('pause',          () => { if (playBtn) playBtn.textContent = '▶'; });
+    videoEl.addEventListener('volumechange',   updateMuteIcon);
+
+    // Auto-hide controls after 3s of no mouse movement
+    const container = document.querySelector('.video-player-container');
+    container?.addEventListener('mousemove', showControls);
+    container?.addEventListener('mouseleave', () => scheduleHideControls(1000));
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', onKeyDown);
+}
+
+function seekToEvent(e) {
+    const seekBar = document.getElementById('ctrl-seek-bar');
+    if (!seekBar || !videoEl.duration) return;
+    const rect = seekBar.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    videoEl.currentTime = pct * videoEl.duration;
+}
+
+function updateSeekBar() {
+    const fill   = document.getElementById('ctrl-seek-fill');
+    const handle = document.getElementById('ctrl-seek-handle');
+    const time   = document.getElementById('ctrl-time');
+    if (!videoEl.duration) return;
+    const pct = videoEl.currentTime / videoEl.duration;
+    if (fill)   fill.style.width      = `${pct * 100}%`;
+    if (handle) handle.style.left     = `${pct * 100}%`;
+    if (time)   time.textContent      = `${fmtTime(videoEl.currentTime)} / ${fmtTime(videoEl.duration)}`;
+}
+
+function updateMuteIcon() {
+    const btn = document.getElementById('ctrl-mute');
+    const vol = document.getElementById('ctrl-volume');
+    if (!btn) return;
+    btn.textContent = (videoEl.muted || videoEl.volume === 0) ? '🔇' : '🔊';
+    if (vol) vol.value = videoEl.muted ? 0 : videoEl.volume;
+}
+
+function toggleFullscreen() {
+    const container = document.querySelector('.video-player-container');
+    if (!document.fullscreenElement) {
+        container?.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+function showControls() {
+    if (!customControls) return;
+    customControls.classList.remove('controls-hidden');
+    scheduleHideControls(3000);
+}
+
+function scheduleHideControls(delay) {
+    clearTimeout(hideControlsTimer);
+    hideControlsTimer = setTimeout(() => {
+        if (!videoEl.paused) customControls?.classList.add('controls-hidden');
+    }, delay);
+}
+
+function onKeyDown(e) {
+    if (!modal.classList.contains('active')) return;
+    if (state.player.usingFallback) return;
+    // Ignore when typing in inputs
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    switch (e.key) {
+        case ' ': case 'k':
+            e.preventDefault();
+            videoEl.paused ? videoEl.play().catch(() => {}) : videoEl.pause();
+            break;
+        case 'ArrowRight': videoEl.currentTime += 10; break;
+        case 'ArrowLeft':  videoEl.currentTime -= 10; break;
+        case 'ArrowUp':    videoEl.volume = Math.min(1, videoEl.volume + 0.1); break;
+        case 'ArrowDown':  videoEl.volume = Math.max(0, videoEl.volume - 0.1); break;
+        case 'm': case 'M': videoEl.muted = !videoEl.muted; break;
+        case 'f': case 'F': toggleFullscreen(); break;
+    }
+}
+
+function fmtTime(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    return h > 0
+        ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+        : `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+// ── Autoplay helper ───────────────────────────────────────────────────────────
+
 function tryPlay() {
     videoEl.muted = false;
     videoEl.play().catch(err => {
@@ -91,9 +227,6 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
 
 // ── Codec / container capability detection ────────────────────────────────────
 
-// Returns true if the browser can natively play MKV containers.
-// Chrome on Windows/Mac supports MKV (H.264 and HEVC via OS decoders).
-// Firefox does not — it needs the HLS transcode path.
 function canPlayNativeMkv() {
     const v = document.createElement('video');
     return v.canPlayType('video/x-matroska; codecs="avc1.42E01E"') !== '' ||
@@ -114,8 +247,6 @@ async function loadDirect(result) {
     state.player.usingFallback = false;
     state.player.allStreams    = result.allStreams || [];
 
-    // If server provided a raw stream URL and the browser can play MKV natively,
-    // skip the transcode entirely — near-instant start vs ~12s transcode wait.
     if (result.nativeUrl && canPlayNativeMkv()) {
         console.log('[player] native MKV supported — skipping transcode');
         result = { ...result, url: result.nativeUrl, mimeType: 'mp4' };
@@ -124,13 +255,15 @@ async function loadDirect(result) {
     const saved = await getSavedProgress();
 
     destroyHls();
-    iframeEl.style.display = 'none';
-    iframeEl.src           = '';
-    videoEl.style.display  = 'block';
+    iframeEl.style.display          = 'none';
+    iframeEl.src                    = '';
+    if (closeBtnIframe) closeBtnIframe.style.display = 'none';
+    videoEl.style.display           = 'block';
+    customControls.style.display    = 'flex';
 
     if (result.mimeType === 'hls' && window.Hls?.isSupported()) {
         currentHls = new Hls({
-            fragLoadingTimeOut:    120000,  // transcode can take up to ~12s per segment
+            fragLoadingTimeOut:    120000,
             fragLoadingMaxRetry:   6,
             fragLoadingRetryDelay: 2000,
         });
@@ -162,17 +295,20 @@ async function loadDirect(result) {
     updateQualityPicker(state.player.allStreams);
     updateDubToggle(state.player.allStreams);
     startProgressTimer();
+    showControls();
 }
 
 // ── Iframe fallback ───────────────────────────────────────────────────────────
 
 function loadIframe(url) {
-    state.player.usingFallback = true;
+    state.player.usingFallback    = true;
     destroyHls();
-    videoEl.style.display  = 'none';
-    videoEl.src            = '';
-    iframeEl.style.display = 'block';
-    iframeEl.src           = url;
+    videoEl.style.display         = 'none';
+    videoEl.src                   = '';
+    customControls.style.display  = 'none';
+    if (closeBtnIframe) { closeBtnIframe.style.display = 'block'; }
+    iframeEl.style.display        = 'block';
+    iframeEl.src                  = url;
     hideLoading();
     if (qualityPicker) qualityPicker.style.display = 'none';
     if (dubToggle)     dubToggle.style.display     = 'none';
@@ -291,9 +427,9 @@ function scheduleNextEpisode() {
     const { season, episode } = state.player;
     const nextEp = episode + 1;
 
-    const panel = document.getElementById('next-episode-panel');
+    const panel      = document.getElementById('next-episode-panel');
     const countdownEl = document.getElementById('auto-play-countdown');
-    const timerSpan = document.getElementById('countdown-timer');
+    const timerSpan  = document.getElementById('countdown-timer');
 
     if (panel) {
         document.getElementById('next-episode-title').textContent = `Season ${season}, Episode ${nextEp}`;
@@ -327,9 +463,9 @@ function cancelNextEpisode() {
 }
 
 function hideNextEpisodeUI() {
-    const panel = document.getElementById('next-episode-panel');
+    const panel     = document.getElementById('next-episode-panel');
     const countdown = document.getElementById('auto-play-countdown');
-    if (panel) panel.style.display = 'none';
+    if (panel)     panel.style.display     = 'none';
     if (countdown) countdown.style.display = 'none';
 }
 
@@ -344,16 +480,20 @@ export function closePlayer() {
     saveProgress();
     clearInterval(progressSaveTimer);
     clearInterval(countdownTimer);
+    clearTimeout(hideControlsTimer);
     hideNextEpisodeUI();
     lastSavedTime = 0;
-    videoEl.pause();  // settle any pending play() promise before HLS.js teardown
+    videoEl.pause();
     destroyHls();
-    videoEl.muted          = false;
-    videoEl.src            = '';
-    iframeEl.src           = '';
-    if (unmuteBtn) unmuteBtn.style.display = 'none';
-    videoEl.style.display  = 'none';
-    iframeEl.style.display = 'none';
+    videoEl.muted         = false;
+    videoEl.src           = '';
+    iframeEl.src          = '';
+    if (unmuteBtn)       unmuteBtn.style.display       = 'none';
+    if (closeBtnIframe)  closeBtnIframe.style.display  = 'none';
+    videoEl.style.display         = 'none';
+    iframeEl.style.display        = 'none';
+    customControls.style.display  = 'none';
+    customControls.classList.remove('controls-hidden');
 
     modal.classList.remove('active');
     document.body.style.overflow = '';
@@ -367,8 +507,9 @@ export function closePlayer() {
 }
 
 function showLoading() {
-    videoEl.style.display  = 'none';
-    iframeEl.style.display = 'none';
+    videoEl.style.display         = 'none';
+    iframeEl.style.display        = 'none';
+    customControls.style.display  = 'none';
     const overlay = document.getElementById('stream-reconnect-overlay');
     overlay.innerHTML = `<div class="reconnect-content"><div class="reconnect-spinner"></div><p>Finding stream...</p></div>`;
     overlay.style.display = 'flex';
