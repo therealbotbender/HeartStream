@@ -539,6 +539,7 @@ body {
     display: flex;
     gap: 1rem;
     overflow-x: auto;
+    overflow-y: visible;
     padding: 0;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -5430,17 +5431,26 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #6366f1, #a855f7);
 }
 
-/* ── Cards — hover lift (no scale so neighbours stay reachable) ── */
+/* ── Cards — poster expands from bottom centre (title stays fixed) ── */
 .content-card {
     cursor: pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, z-index 0s;
     position: relative;
     z-index: 1;
 }
+
+.card-poster {
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    transform-origin: bottom center;
+    will-change: transform;
+}
+
 .content-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.7);
     z-index: 10;
+}
+
+.content-card:hover .card-poster {
+    transform: scale(1.55);
+    box-shadow: 0 22px 60px rgba(0,0,0,0.88);
 }
 .card-overlay {
     opacity: 0;
