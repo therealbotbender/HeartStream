@@ -14,7 +14,6 @@ services:
       - TZ=${TZ:-America/New_York}
     volumes:
       - jackett-config:/config
-      - ./config/jackett/ServerConfig.json:/config/Jackett/ServerConfig.json
     ports:
       - "9117:9117"
     networks:
