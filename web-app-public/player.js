@@ -219,6 +219,7 @@ function tryPlay() {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 export async function play(contentId, type, tmdbId, season = null, episode = null) {
+    console.log('[play]', { contentId, type, tmdbId, season, episode });
     state.player = { contentId, type, tmdbId, season, episode, allStreams: [] };
     introTimes   = null;
     endingTimes  = null;
@@ -231,6 +232,7 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
             ? await API.streams.movie(tmdbId)
             : await API.streams.tv(tmdbId, season, episode);
 
+        console.log('[play] stream result', { url: result?.url?.slice(0,80), success: result?.success });
         if (result.success && result.url) {
             await loadDirect(result);
         } else {
