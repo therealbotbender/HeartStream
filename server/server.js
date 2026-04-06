@@ -520,21 +520,22 @@ app.get('/api/intro/:contentId', async (req, res) => {
             return res.json({ ...result, source });
         };
 
-        // 3. TheIntroDB — TMDB-native, covers intro/recap/credits/preview
-        if (tmdbId && process.env.TIDB_TOKEN) {
+        // 3. TheIntroDB — TMDB-native, covers intro/recap/credits/preview (reads are public)
+        if (tmdbId && season != null && episode != null) {
             try {
-                const params = new URLSearchParams({ tmdb_id: tmdbId });
-                if (season  != null) params.set('season', season);
-                if (episode != null) params.set('episode', episode);
+                const headers = process.env.TIDB_TOKEN
+                    ? { Authorization: `Bearer ${process.env.TIDB_TOKEN}` }
+                    : {};
                 const tidbRes = await axios.get(
-                    `https://api.theintrodb.org/v2/media?${params}`,
-                    { headers: { Authorization: `Bearer ${process.env.TIDB_TOKEN}` }, timeout: 5000 }
+                    `https://api.theintrodb.org/v2/media?tmdb_id=${tmdbId}&season=${season}&episode=${episode}`,
+                    { headers, timeout: 5000 }
                 );
                 if (tidbRes.status === 200 && tidbRes.data) {
                     const d       = tidbRes.data;
-                    const intro   = d.intro?.[0];
-                    const credits = d.credits?.[0];
-                    if (intro) {
+                    // response fields may be objects or single-element arrays
+                    const intro   = Array.isArray(d.intro)   ? d.intro[0]   : d.intro;
+                    const credits = Array.isArray(d.credits) ? d.credits[0] : d.credits;
+                    if (intro?.start_ms != null) {
                         return cacheAndReturn({
                             intro_start:  Math.floor(intro.start_ms   / 1000),
                             intro_end:    Math.floor(intro.end_ms     / 1000),
