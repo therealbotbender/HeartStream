@@ -186,12 +186,29 @@ app.use('/api/mf', (req, res) => {
 
         if (req.method === 'HEAD') return res.end();
 
-        if (isManifest) {
-            // Rewrite absolute internal MediaFlow URLs → /api/mf so segment
-            // requests also route through this proxy.
-            let body = '';
-            upstream.on('data', chunk => { body += chunk; });
+        const cl = parseInt(upstream.headers['content-length'] || '0');
+        const looksLikeManifest = isManifest && (cl === 0 || cl < 512 * 1024);
+
+        if (looksLikeManifest) {
+            // Buffer and rewrite internal MediaFlow URLs → /api/mf so all
+            // segment requests also route through this proxy.
+            // Use Buffer array (not string concat) to avoid max string length crash.
+            const chunks = [];
+            let size = 0;
+            upstream.on('data', chunk => {
+                size += chunk.length;
+                if (size > 512 * 1024) {
+                    // Unexpectedly large — not a real manifest, switch to piping
+                    upstream.removeAllListeners('data');
+                    upstream.removeAllListeners('end');
+                    res.write(Buffer.concat(chunks));
+                    upstream.pipe(res);
+                    return;
+                }
+                chunks.push(chunk);
+            });
             upstream.on('end', () => {
+                const body = Buffer.concat(chunks).toString('utf8');
                 res.send(body.replaceAll(MEDIAFLOW_INTERNAL, '/api/mf'));
             });
         } else {
