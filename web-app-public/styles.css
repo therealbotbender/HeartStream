@@ -1235,6 +1235,13 @@ body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    transition: color 0.2s;
+}
+
+.detail-episodes-grid .episode-card:hover .ep-overview {
+    -webkit-line-clamp: unset;
+    overflow: visible;
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .detail-episodes-grid .ep-bar {
