@@ -22,8 +22,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/New_York}
-    command: >
-      /bin/sh -c "sed -i 's/\"AllowExternal\": false/\"AllowExternal\": true/g' /config/Jackett/ServerConfig.json && /init"
+      - RUN_OPTS=--AllowExternal  # <--- Use this instead of the command fix    
     ports:
       - "9117:9117"
     volumes:
