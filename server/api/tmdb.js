@@ -217,7 +217,12 @@ class TMDBService {
             rating: tmdbTV.vote_average,
             genreIds: tmdbTV.genre_ids || [],
             originalLanguage: tmdbTV.original_language || null,
-            adult: tmdbTV.adult || false
+            adult: tmdbTV.adult || false,
+            seasons: Array.isArray(tmdbTV.seasons)
+                ? tmdbTV.seasons
+                    .filter(s => s.season_number > 0)
+                    .map(s => ({ seasonNumber: s.season_number, episodeCount: s.episode_count }))
+                : undefined
         };
     }
 

@@ -735,6 +735,12 @@ function wireGlobalEvents() {
             document.getElementById('content-detail-modal').classList.remove('active');
         });
 
+    // Escape closes any open modal
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+    });
+
     // Delegated card clicks (play + detail)
     document.addEventListener('click', e => {
         const card = e.target.closest('.content-card');

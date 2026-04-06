@@ -228,9 +228,9 @@ export async function play(contentId, type, tmdbId, season = null, episode = nul
 // ── Codec / container capability detection ────────────────────────────────────
 
 function canPlayNativeMkv() {
-    const v = document.createElement('video');
-    return v.canPlayType('video/x-matroska; codecs="avc1.42E01E"') !== '' ||
-           v.canPlayType('video/x-matroska') !== '';
+    // Only Chromium-based browsers reliably decode MKV with arbitrary codecs (H.264, HEVC, etc.)
+    // Firefox media.mkv.enabled=true allows the container but video decoding is still limited
+    return /Chrome\//.test(navigator.userAgent);
 }
 
 // ── Direct stream ─────────────────────────────────────────────────────────────
