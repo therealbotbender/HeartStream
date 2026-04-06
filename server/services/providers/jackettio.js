@@ -60,7 +60,7 @@ function buildConfig() {
         maxTorrents:            5,
         sortCached:             [['quality', true], ['size', true]],
         sortUncached:           [['seeders', true]],
-        hideUncached:           true,
+        hideUncached:           false,
         priotizePackTorrents:   2,
         forceCacheNextEpisode:  true,
         indexerTimeoutSec:      8,
