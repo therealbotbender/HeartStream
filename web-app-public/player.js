@@ -22,6 +22,7 @@ let currentHls        = null;
 let countdownTimer    = null;
 let hideControlsTimer = null;
 let introTimes        = null; // { intro_start, intro_end } seconds
+let endingTimes       = null; // { ending_start, ending_end } seconds — from AniSkip 'ed' or null
 let autoSkipIntro     = localStorage.getItem('hs-auto-skip-intro') === 'true';
 let autoPlayNext      = localStorage.getItem('hs-auto-play-next')  === 'true';
 
@@ -118,7 +119,7 @@ function initCustomControls() {
         document.addEventListener('mouseup', onUp);
     });
 
-    videoEl.addEventListener('timeupdate',   () => { updateSeekBar(); checkSkipIntro(); });
+    videoEl.addEventListener('timeupdate',   () => { updateSeekBar(); checkSkipIntro(); checkNearEnd(); });
     videoEl.addEventListener('play',         () => { if (playBtn) playBtn.textContent = '⏸'; });
     videoEl.addEventListener('pause',        () => { if (playBtn) playBtn.textContent = '▶'; });
     videoEl.addEventListener('volumechange', updateMuteIcon);
@@ -220,6 +221,7 @@ function tryPlay() {
 export async function play(contentId, type, tmdbId, season = null, episode = null) {
     state.player = { contentId, type, tmdbId, season, episode, allStreams: [] };
     introTimes   = null;
+    endingTimes  = null;
 
     openModal();
     showLoading();
@@ -359,11 +361,14 @@ async function fetchIntroTimes() {
         const data = await API.intro.get(
             state.player.contentId,
             state.player.season,
-            state.player.episode
+            state.player.episode,
+            state.player.tmdbId
         );
-        introTimes = data; // null if none found
+        introTimes  = (data?.intro_start != null)  ? data : null;
+        endingTimes = (data?.ending_start != null)  ? data : null;
     } catch {
-        introTimes = null;
+        introTimes  = null;
+        endingTimes = null;
     }
 }
 
@@ -383,6 +388,36 @@ function checkSkipIntro() {
 
 function skipIntro() {
     if (introTimes) videoEl.currentTime = introTimes.intro_end;
+}
+
+function checkNearEnd() {
+    if (state.player.type !== 'tv') return;
+    if (!videoEl.duration || videoEl.duration < 120) return;
+
+    const panel = document.getElementById('next-episode-panel');
+    if (!panel || panel.style.display !== 'none') return; // already showing
+
+    const t         = videoEl.currentTime;
+    const remaining = videoEl.duration - t;
+
+    // Use AniSkip ending timestamp if available, otherwise 90s heuristic
+    const triggered = endingTimes
+        ? (t >= endingTimes.ending_start)
+        : (remaining <= 90);
+
+    if (!triggered) return;
+
+    const next = getNextEpisode();
+    if (!next) return;
+
+    if (autoPlayNext) {
+        playNextEpisode();
+        return;
+    }
+
+    document.getElementById('next-episode-title').textContent =
+        `Season ${next.season}, Episode ${next.episode}`;
+    panel.style.display = 'flex';
 }
 
 // ── Submit intro modal ────────────────────────────────────────────────────────
@@ -615,6 +650,7 @@ export function closePlayer() {
     document.getElementById('submit-intro-modal')?.classList.remove('active');
     lastSavedTime = 0;
     introTimes    = null;
+    endingTimes   = null;
     videoEl.pause();
     destroyHls();
     videoEl.muted  = false;

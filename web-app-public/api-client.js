@@ -135,7 +135,7 @@ export const API = (() => {
     // ── Intro times ───────────────────────────────────────────────────────────
 
     const intro = {
-        get:    (contentId, season, episode) => get(`/api/intro/${encodeURIComponent(contentId)}`, { season, episode }),
+        get:    (contentId, season, episode, tmdbId) => get(`/api/intro/${encodeURIComponent(contentId)}`, { season, episode, tmdbId }),
         submit: (data)                       => post('/api/intro', data)
     };
 

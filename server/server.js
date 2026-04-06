@@ -3,6 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const { spawn } = require('child_process');
 const http = require('http');
+const axios = require('axios');
 const db = require('./database');
 const ContentService = require('./api/contentService');
 const streamResolver = require('./services/streamResolver');
@@ -486,14 +487,57 @@ app.get('/api/intro/:contentId', async (req, res) => {
         const contentId = decodeURIComponent(req.params.contentId);
         const season    = req.query.season  ? parseInt(req.query.season)  : null;
         const episode   = req.query.episode ? parseInt(req.query.episode) : null;
+        const tmdbId    = req.query.tmdbId  ? parseInt(req.query.tmdbId)  : null;
 
         // Check persistent cache first
         const cached = await db.getCachedIntroData(contentId, season, episode);
-        if (cached) return res.json({ intro_start: cached.intro_start, intro_end: cached.intro_end, source: cached.source });
+        if (cached) return res.json({
+            intro_start:   cached.intro_start,
+            intro_end:     cached.intro_end,
+            ending_start:  cached.ending_start ?? null,
+            ending_end:    cached.ending_end   ?? null,
+            source:        cached.source
+        });
 
         // Fall back to best community submission
         const sub = await db.getUserIntroSubmissions(contentId, season, episode);
-        if (sub) return res.json({ intro_start: sub.intro_start, intro_end: sub.intro_end, source: 'community' });
+        if (sub) return res.json({ intro_start: sub.intro_start, intro_end: sub.intro_end, ending_start: null, ending_end: null, source: 'community' });
+
+        // Try AniSkip (anime only) — needs tmdbId + episode
+        if (tmdbId && episode) {
+            try {
+                const armRes  = await axios.get(`https://arm.haglund.dev/api/v2/ids?source=tmdb&id=${tmdbId}`, { timeout: 5000 });
+                const malId   = armRes.data?.myanimelist;
+                if (malId) {
+                    const skipRes  = await axios.get(
+                        `https://api.aniskip.com/v2/skip-times/${malId}/${episode}?types=op&types=ed`,
+                        { timeout: 5000 }
+                    );
+                    if (skipRes.data?.found) {
+                        const op = skipRes.data.results.find(r => r.skipType === 'op');
+                        const ed = skipRes.data.results.find(r => r.skipType === 'ed');
+                        const result = {
+                            intro_start:  op ? Math.floor(op.interval.startTime) : null,
+                            intro_end:    op ? Math.floor(op.interval.endTime)   : null,
+                            ending_start: ed ? Math.floor(ed.interval.startTime) : null,
+                            ending_end:   ed ? Math.floor(ed.interval.endTime)   : null,
+                            source: 'aniskip'
+                        };
+                        // Cache for 7 days
+                        if (result.intro_start != null) {
+                            await db.setCachedIntroData(
+                                contentId, season, episode,
+                                result.intro_start, result.intro_end,
+                                'aniskip', 0.9, JSON.stringify(result), 168
+                            );
+                        }
+                        return res.json(result);
+                    }
+                }
+            } catch (e) {
+                // AniSkip unavailable — fall through to null
+            }
+        }
 
         res.json(null);
     } catch (err) {
