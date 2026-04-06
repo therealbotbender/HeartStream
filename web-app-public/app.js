@@ -774,9 +774,13 @@ function wireGlobalEvents() {
         if (playBtn) {
             const tmdbId = id.split('_')[1] || id;
             if (type === 'movie') play(id, 'movie', tmdbId);
-            else openContentDetail(id, type);  // TV needs episode selection
-        } else {
-            openContentDetail(id, type);
+            else openContentDetail(id, type);
+        } else if (!card.classList.contains('flipping')) {
+            card.classList.add('flipping');
+            setTimeout(() => {
+                card.classList.remove('flipping');
+                openContentDetail(id, type);
+            }, 380);
         }
     });
 
