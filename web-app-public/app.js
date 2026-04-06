@@ -543,14 +543,23 @@ async function runSearch(query) {
 // ── Content detail modal ──────────────────────────────────────────────────────
 
 async function openContentDetail(contentId, type) {
-    const modal = document.getElementById('content-detail-modal');
+    const modal  = document.getElementById('content-detail-modal');
+    const tmdbId = contentId.split('_')[1] || contentId;
     modal.classList.add('active');
+
+    // Set onclick IMMEDIATELY with correct contentId so clicking Play before
+    // data loads doesn't fire the previous modal's handler (race condition fix).
+    const playBtn = document.getElementById('detail-play-btn');
+    playBtn.onclick = () => {
+        modal.classList.remove('active');
+        const lw = state.continueWatching?.find(c => c.content_id === contentId);
+        if (type === 'movie') play(contentId, 'movie', tmdbId);
+        else play(contentId, 'tv', tmdbId, lw?.season_number || 1, lw?.episode_number || 1);
+    };
 
     const data = await API.content.details(type, contentId).catch(() => null);
     if (!data) { modal.classList.remove('active'); return; }
     state.selectedContent = data;
-
-    const tmdbId = contentId.split('_')[1] || contentId;
 
     document.getElementById('detail-poster').src       = data.poster
         ? `https://image.tmdb.org/t/p/w342${data.poster}` : '/icons/placeholder.png';
@@ -594,20 +603,9 @@ async function openContentDetail(contentId, type) {
         API.streams.tv(tmdbId, s, e).catch(() => {});
     }
 
-    // Play button label + action
+    // Play button label
     const lastWatched = state.continueWatching?.find(c => c.content_id === contentId);
     updatePlayButtonLabel(contentId, type, lastWatched);
-
-    document.getElementById('detail-play-btn').onclick = () => {
-        modal.classList.remove('active');
-        if (type === 'movie') {
-            play(contentId, 'movie', tmdbId);
-        } else {
-            const s = lastWatched?.season_number  || 1;
-            const e = lastWatched?.episode_number || 1;
-            play(contentId, 'tv', tmdbId, s, e);
-        }
-    };
 
     document.getElementById('detail-add-playlist-btn').onclick = () => {
         openAddToPlaylistModal(contentId, type);
