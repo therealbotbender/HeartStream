@@ -838,6 +838,15 @@ function wireGlobalEvents() {
         }
     });
 
+    // Delegated carousel arrows
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.carousel-arrow');
+        if (!btn) return;
+        const target    = btn.dataset.target;
+        const direction = btn.classList.contains('carousel-arrow-left') ? 'left' : 'right';
+        scrollCarousel(target, direction);
+    });
+
     // Delegated "See all" buttons
     document.addEventListener('click', e => {
         const btn = e.target.closest('.see-all-btn');
