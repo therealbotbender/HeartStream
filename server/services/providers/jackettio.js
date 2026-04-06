@@ -43,12 +43,23 @@ function buildConfig() {
 
 const CONFIG = buildConfig();
 
+// MP4-likely sources (browser-native, no transcode needed)
+const MP4_HINTS = ['yts', 'webrip', 'web-dl', 'webdl', 'web.dl', 'amzn', 'nf', 'hulu', '.mp4'];
+
+function isMp4Likely(stream) {
+    const text = ((stream.name || '') + ' ' + (stream.url || '')).toLowerCase();
+    return MP4_HINTS.some(h => text.includes(h));
+}
+
 function rankStream(stream) {
     const name = (stream.name || stream.description || '').toLowerCase();
+    let qualityScore = QUALITY_RANK.length;
     for (let i = 0; i < QUALITY_RANK.length; i++) {
-        if (name.includes(`${QUALITY_RANK[i]}p`)) return i;
+        if (name.includes(`${QUALITY_RANK[i]}p`)) { qualityScore = i; break; }
     }
-    return QUALITY_RANK.length;
+    // MP4-likely releases get a bonus — prefer them over same-quality MKV
+    const formatBonus = isMp4Likely(stream) ? 0 : 0.5;
+    return qualityScore + formatBonus;
 }
 
 class JackettioProvider {
