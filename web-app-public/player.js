@@ -16,9 +16,10 @@ import { state } from './state.js';
 // DOM refs — resolved once in initPlayer()
 let videoEl, modal, closeBtn, dubToggle,
     subBtn, dubBtnEl, qualityPicker, unmuteBtn, customControls;
-let progressSaveTimer = null;
-let lastSavedTime     = 0;
-let countdownTimer    = null;
+let progressSaveTimer  = null;
+let lastSavedTime      = 0;
+let countdownTimer     = null;
+let introSubmitTimer   = null;
 let hideControlsTimer = null;
 let introTimes        = null; // { intro_start, intro_end } seconds
 let endingTimes       = null; // { ending_start, ending_end } seconds — from AniSkip 'ed' or null
@@ -269,9 +270,13 @@ async function loadDirect(result) {
 
     // Show/hide submit intro button and fetch times (TV only)
     const submitBtn = document.getElementById('submit-intro-btn');
+    clearTimeout(introSubmitTimer);
     if (state.player.type === 'tv' && state.player.season != null) {
         if (submitBtn) submitBtn.style.display = 'block';
         fetchIntroTimes();
+        introSubmitTimer = setTimeout(() => {
+            if (submitBtn) submitBtn.style.display = 'none';
+        }, 10000);
     } else {
         if (submitBtn) submitBtn.style.display = 'none';
     }
@@ -621,6 +626,7 @@ export function closePlayer() {
     clearInterval(progressSaveTimer);
     clearInterval(countdownTimer);
     clearTimeout(hideControlsTimer);
+    clearTimeout(introSubmitTimer);
     hideNextEpisodeUI();
     const skipContainer = document.getElementById('skip-intro-container');
     if (skipContainer) skipContainer.style.display = 'none';

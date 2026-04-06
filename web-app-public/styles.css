@@ -3076,25 +3076,25 @@ textarea:focus {
 /* Intro submission styles */
 .submit-intro-btn {
     position: absolute;
-    bottom: 100px;
-    left: 2rem;
-    background: rgba(0, 0, 0, 0.8);
-    color: #ffffff;
-    border: 2px solid #ffffff;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
+    bottom: 64px;
+    left: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
     font-family: inherit;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: opacity 0.4s ease;
     pointer-events: auto;
-    font-size: 0.9rem;
+    font-size: 0.68rem;
 }
 
 .submit-intro-btn:hover {
-    background: #ffffff;
-    color: #000000;
-    transform: translateY(-2px);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.75);
 }
 
 .intro-help-text {
