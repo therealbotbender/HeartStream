@@ -17,8 +17,10 @@ import {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+    loadSavedPrefs();
     initPlayer();
     wireGlobalEvents();
+    wireCustomizeModal();
     await loadUserScreen();
 });
 
@@ -704,10 +706,71 @@ function wireUserModals() {
     });
 }
 
-// ── Theme ─────────────────────────────────────────────────────────────────────
+// ── Theme & UI mode ───────────────────────────────────────────────────────────
 
 function applyTheme(theme) {
     document.body.dataset.theme = theme || 'default';
+}
+
+function applyUiMode(mode) {
+    document.body.classList.toggle('ui-simple', mode === 'simple');
+}
+
+function loadSavedPrefs() {
+    applyTheme(localStorage.getItem('hs-theme') || 'default');
+    applyUiMode(localStorage.getItem('hs-ui-mode') || 'fancy');
+}
+
+function wireCustomizeModal() {
+    const modal      = document.getElementById('theme-settings-modal');
+    const openBtn    = document.getElementById('theme-settings-btn');
+    const closeBtn   = document.getElementById('close-customize');
+    const cancelBtn  = document.getElementById('cancel-theme-settings');
+    const applyBtn   = document.getElementById('apply-theme-settings');
+
+    // Open
+    openBtn?.addEventListener('click', () => {
+        // Sync selections to current saved state
+        const savedTheme = localStorage.getItem('hs-theme') || 'default';
+        const savedMode  = localStorage.getItem('hs-ui-mode') || 'fancy';
+        modal.querySelectorAll('.theme-option').forEach(o =>
+            o.classList.toggle('selected', o.dataset.theme === savedTheme)
+        );
+        modal.querySelectorAll('.ui-mode-option').forEach(o =>
+            o.classList.toggle('selected', o.dataset.mode === savedMode)
+        );
+        modal.classList.add('active');
+    });
+
+    // Theme pill clicks
+    modal.querySelectorAll('.theme-option').forEach(o =>
+        o.addEventListener('click', () => {
+            modal.querySelectorAll('.theme-option').forEach(x => x.classList.remove('selected'));
+            o.classList.add('selected');
+        })
+    );
+
+    // UI mode pill clicks
+    modal.querySelectorAll('.ui-mode-option').forEach(o =>
+        o.addEventListener('click', () => {
+            modal.querySelectorAll('.ui-mode-option').forEach(x => x.classList.remove('selected'));
+            o.classList.add('selected');
+        })
+    );
+
+    // Apply
+    applyBtn?.addEventListener('click', () => {
+        const theme = modal.querySelector('.theme-option.selected')?.dataset.theme || 'default';
+        const mode  = modal.querySelector('.ui-mode-option.selected')?.dataset.mode  || 'fancy';
+        localStorage.setItem('hs-theme',   theme);
+        localStorage.setItem('hs-ui-mode', mode);
+        applyTheme(theme);
+        applyUiMode(mode);
+        modal.classList.remove('active');
+    });
+
+    // Close / cancel
+    [closeBtn, cancelBtn].forEach(b => b?.addEventListener('click', () => modal.classList.remove('active')));
 }
 
 // ── Global event wiring ───────────────────────────────────────────────────────
@@ -776,24 +839,28 @@ function wireGlobalEvents() {
             if (type === 'movie') play(id, 'movie', tmdbId);
             else openContentDetail(id, type);
         } else if (!card.classList.contains('flipping')) {
-            // Capture position before animation starts
-            const rect = card.getBoundingClientRect();
-            card.classList.add('flipping');
-
-            setTimeout(() => {
-                card.classList.remove('flipping');
-
-                // Tell the modal where to expand from
-                const modal  = document.getElementById('content-detail-modal');
-                const modalW = Math.min(560, window.innerWidth * 0.95);
-                modal.style.setProperty('--from-x',     (rect.left + rect.width  / 2 - window.innerWidth  / 2) + 'px');
-                modal.style.setProperty('--from-y',     (rect.top  + rect.height / 2 - window.innerHeight / 2) + 'px');
-                modal.style.setProperty('--from-scale', rect.width / modalW);
-                modal.classList.add('card-origin');
-                setTimeout(() => modal.classList.remove('card-origin'), 500);
-
+            if (document.body.classList.contains('ui-simple')) {
                 openContentDetail(id, type);
-            }, 390);
+            } else {
+                // Capture position before animation starts
+                const rect = card.getBoundingClientRect();
+                card.classList.add('flipping');
+
+                setTimeout(() => {
+                    card.classList.remove('flipping');
+
+                    // Tell the modal where to expand from
+                    const modal  = document.getElementById('content-detail-modal');
+                    const modalW = Math.min(560, window.innerWidth * 0.95);
+                    modal.style.setProperty('--from-x',     (rect.left + rect.width  / 2 - window.innerWidth  / 2) + 'px');
+                    modal.style.setProperty('--from-y',     (rect.top  + rect.height / 2 - window.innerHeight / 2) + 'px');
+                    modal.style.setProperty('--from-scale', rect.width / modalW);
+                    modal.classList.add('card-origin');
+                    setTimeout(() => modal.classList.remove('card-origin'), 500);
+
+                    openContentDetail(id, type);
+                }, 390);
+            }
         }
     });
 

@@ -370,12 +370,16 @@
             </div>
         </div>
 
-        <!-- Theme Settings Modal -->
+        <!-- Customize Modal -->
         <div id="theme-settings-modal" class="modal">
-            <div class="modal-content">
-                <h2>Theme Settings</h2>
-                <div class="form-group">
-                    <label>Choose Theme:</label>
+            <div class="modal-content customize-modal">
+                <div class="modal-header">
+                    <h2>Customize</h2>
+                    <button class="close-btn" id="close-customize">&times;</button>
+                </div>
+
+                <div class="customize-section">
+                    <h3>Color Theme</h3>
                     <div class="theme-selection" id="theme-settings-selection">
                         <div class="theme-option" data-theme="default">
                             <div class="theme-preview theme-default"></div>
@@ -403,9 +407,26 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="customize-section">
+                    <h3>Card Style</h3>
+                    <div class="ui-mode-selection">
+                        <div class="ui-mode-option" data-mode="fancy">
+                            <div class="ui-mode-icon">✦</div>
+                            <span>Fancy</span>
+                            <small>Flip &amp; animate</small>
+                        </div>
+                        <div class="ui-mode-option" data-mode="simple">
+                            <div class="ui-mode-icon">▤</div>
+                            <span>Simple</span>
+                            <small>Direct click</small>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" id="cancel-theme-settings">Cancel</button>
-                    <button type="button" id="apply-theme-settings">Apply Theme</button>
+                    <button type="button" id="apply-theme-settings">Apply</button>
                 </div>
             </div>
         </div>
