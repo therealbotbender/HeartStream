@@ -5430,16 +5430,17 @@ body[data-theme="red"] .episodes-container::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #6366f1, #a855f7);
 }
 
-/* ── Cards — hover lift + scale ── */
+/* ── Cards — hover lift (no scale so neighbours stay reachable) ── */
 .content-card {
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, z-index 0s;
     position: relative;
+    z-index: 1;
 }
 .content-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.55);
-    z-index: 5;
+    transform: translateY(-10px);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.7);
+    z-index: 10;
 }
 .card-overlay {
     opacity: 0;
